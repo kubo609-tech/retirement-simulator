@@ -1,0 +1,3134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>退職後資産シミュレーター</title>
+<script>
+// 保存済みのテーマ設定をスタイル適用前に反映し、ダーク→ライトの一瞬のちらつきを防ぐ
+(function(){
+  try{
+    if(localStorage.getItem('retirement-dashboard-theme') === 'light'){
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  }catch(e){}
+})();
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg-void:#0B111C;
+  --bg-panel:#121B2B;
+  --bg-panel-2:#0E1622;
+  --bg-card:#16213380;
+  --border:#22304A;
+  --border-soft:#1B2740;
+  --text-1:#E8EEF7;
+  --text-2:#8CA0BE;
+  --text-dim:#5A6E8C;
+  --accent-invest:#3FC7F4;
+  --accent-invest-fill:#3FC7F433;
+  --accent-cash:#F0AC3D;
+  --accent-cash-fill:#F0AC3D33;
+  --accent-principal:#BFE9FB;
+  --accent-warn:#FB5B4B;
+  --accent-good:#37D399;
+  --income-salary:#9B7EF0;
+  --income-postret:#FFCB6B;
+  --income-dc:#34D399;
+  --income-pension:#F2789F;
+  --income-kakyu:#5EEAD4;
+  --income-pension-partner:#C2455C;
+  --income-survivor:#A3E635;
+  --income-expense:#F4F7FB;
+  --income-total-expense:#FFD166;
+  --invest-nisa:#6C8EF5;
+  --invest-taxable:#F2985C;
+  --invest-gain:#37D399;
+  --invest-drawdown:#9FB0C8;
+  --invest-gain-tax:#FB5B4B;
+  --chart-zeroline:#3A4A68;
+  --chart-hoverline:#C5D2E5;
+  --chart-total-line:#F4F7FB;
+  --table-hover-bg:#1a253a;
+  --table-depleted-bg:#2a141480;
+  --radius:14px;
+  --font-display:'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+  --font-body:'Noto Sans JP', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+
+/* ライトモード。印刷時のインク消費を抑えたい場合などに右上のボタンで切り替え可能 */
+:root[data-theme="light"]{
+  --bg-void:#F4F6FA;
+  --bg-panel:#FFFFFF;
+  --bg-panel-2:#EDF0F5;
+  --bg-card:#FFFFFFCC;
+  --border:#D7DEE8;
+  --border-soft:#E6EAF1;
+  --text-1:#1B2233;
+  --text-2:#5B6579;
+  --text-dim:#8890A0;
+  --accent-invest:#0E86B5;
+  --accent-invest-fill:#0E86B533;
+  --accent-cash:#B8760F;
+  --accent-cash-fill:#B8760F33;
+  --accent-principal:#1690B8;
+  --accent-warn:#D33A2C;
+  --accent-good:#1C9A66;
+  --income-salary:#6748C9;
+  --income-postret:#8A6100;
+  --income-dc:#1C9A66;
+  --income-pension:#C93E6C;
+  --income-kakyu:#0F9488;
+  --income-pension-partner:#8F2A46;
+  --income-survivor:#5C7A0F;
+  --income-expense:#1B2233;
+  --income-total-expense:#A8730A;
+  --invest-nisa:#3C5BC7;
+  --invest-taxable:#BD661E;
+  --invest-gain:#1C9A66;
+  --invest-drawdown:#AAB4C4;
+  --invest-gain-tax:#D33A2C;
+  --chart-zeroline:#B7BFCC;
+  --chart-hoverline:#4B5768;
+  --chart-total-line:#1B2233;
+  --table-hover-bg:#EEF2F8;
+  --table-depleted-bg:#FBEAE8CC;
+}
+:root[data-theme="light"] body{background:var(--bg-void);}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -5%, #14304a55, transparent),
+    radial-gradient(ellipse 700px 500px at 100% 10%, #2a1f4a3d, transparent),
+    var(--bg-void);
+  color:var(--text-1);
+  font-family:var(--font-body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+.app{
+  display:grid;
+  grid-template-columns: 340px 1fr;
+  gap:0;
+  min-height:100vh;
+}
+
+/* ---------- Sidebar ---------- */
+.panel{
+  background:var(--bg-panel-2);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  overflow:hidden;
+  position:sticky;
+  top:0;
+}
+.panel-fixed{
+  flex-shrink:0;
+  padding:18px 22px;
+  border-bottom:1px solid var(--border-soft);
+  background:var(--bg-panel-2);
+}
+.panel-fixed .run-btn{margin-top:0;}
+.panel-scroll{
+  position:relative;
+  flex:1;
+  overflow-y:auto;
+  padding:22px 22px 40px;
+}
+.rate-btn{
+  position:absolute;
+  top:24px;
+  right:18px;
+  padding:6px 11px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:transparent;
+  color:var(--text-2);
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  letter-spacing:.02em;
+  cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+.rate-btn:hover{border-color:var(--accent-invest);color:var(--text-1);}
+
+.brand{
+  font-family:var(--font-display);
+  font-weight:900;
+  font-size:15px;
+  letter-spacing:.08em;
+  color:var(--text-1);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:2px;
+  padding-right:76px;
+}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--accent-good);box-shadow:0 0 8px var(--accent-good);}
+.brand-sub{font-size:11px;color:var(--text-2);margin-bottom:26px;letter-spacing:.03em;}
+
+.group{margin-bottom:22px;}
+.group-title{
+  font-family:var(--font-mono);
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.12em;
+  color:var(--accent-invest);
+  text-transform:uppercase;
+  margin-bottom:10px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.group-title::after{content:'';flex:1;height:1px;background:var(--border-soft);order:1;}
+/* グループの開閉。見出しをタップで折りたたむ(スマホでは既定で閉じた状態にする) */
+.group-title{cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}
+.group-title:focus-visible{outline:2px solid var(--accent-invest);outline-offset:3px;border-radius:4px;}
+.group-caret{
+  order:2;flex-shrink:0;
+  width:9px;height:9px;
+  border-right:1.6px solid var(--text-dim);
+  border-bottom:1.6px solid var(--text-dim);
+  transform:rotate(45deg) translate(-2px,-2px);
+  transition:transform .18s;
+}
+.group.collapsed .group-caret{transform:rotate(-45deg) translate(-1px,1px);}
+.group.collapsed .group-body{display:none;}
+.group.collapsed{margin-bottom:12px;}
+
+.field{margin-bottom:11px;}
+.field label{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  font-size:12px;
+  color:var(--text-2);
+  margin-bottom:5px;
+}
+.field label .unit{font-size:10px;color:var(--text-dim);}
+.field input[type=number], .field input[type=text], .field select{
+  width:100%;
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text-1);
+  font-family:var(--font-mono);
+  font-size:13.5px;
+  padding:8px 10px;
+  outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+.field input[type=number]:focus, .field input[type=text]:focus, .field select:focus{
+  border-color:var(--accent-invest);
+  box-shadow:0 0 0 3px #3fc7f424;
+}
+.field select{
+  font-family:var(--font-body);
+  font-size:12.5px;
+  cursor:pointer;
+  appearance:none;
+  -webkit-appearance:none;
+  padding-right:28px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1.5L6 6.5L11 1.5' stroke='%238CA0BE' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat:no-repeat;
+  background-position:right 10px center;
+  background-size:10px 7px;
+}
+.field select option{background:var(--bg-panel);color:var(--text-1);}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.field-row.three{grid-template-columns:1fr 1fr 1fr;gap:6px;}
+.field-row.three .field label{font-size:11px;gap:4px;}
+.field-row.three .field input{padding:8px 7px;font-size:12.5px;}
+
+/* ライフステージ・リスク設定のサブ見出し / スポット支出の行 */
+.sub-title{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.05em;
+  color:var(--text-2);
+  margin:16px 0 8px;
+}
+.sub-title:first-of-type{margin-top:4px;}
+.spot-row{
+  border:1px solid var(--border-soft);
+  border-radius:9px;
+  padding:9px 10px 7px;
+  margin-bottom:8px;
+}
+.spot-row[hidden]{display:none;}
+.spot-head{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:10.5px;letter-spacing:.05em;color:var(--text-dim);
+  margin-bottom:7px;
+}
+.spot-del{
+  background:transparent;border:none;padding:1px 4px;border-radius:4px;
+  color:var(--text-dim);font-size:12px;line-height:1;cursor:pointer;
+  transition:color .15s;
+}
+.spot-del:hover{color:var(--accent-warn);}
+.spot-add{width:100%;margin-top:2px;}
+.spot-add[hidden]{display:none;}
+
+.checkline{
+  display:flex;align-items:center;gap:8px;
+  font-size:12.5px;color:var(--text-2);
+  margin-top:4px;
+}
+.checkline input{accent-color:var(--accent-invest);width:15px;height:15px;}
+.checkline.disabled{opacity:.42;}
+.checkline.disabled input{cursor:not-allowed;}
+
+.run-btn{
+  width:100%;
+  margin-top:8px;
+  padding:13px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(135deg,#3FC7F4,#37D399);
+  color:#06131D;
+  font-family:var(--font-display);
+  font-weight:900;
+  font-size:14px;
+  letter-spacing:.03em;
+  cursor:pointer;
+  transition:transform .12s, box-shadow .12s;
+  box-shadow:0 6px 20px #3fc7f42a;
+}
+.run-btn:hover{transform:translateY(-1px);box-shadow:0 10px 26px #3fc7f440;}
+.run-btn:active{transform:translateY(0);}
+
+.save-row{display:flex;align-items:center;gap:8px;margin-top:10px;}
+.save-btn{
+  flex:1;
+  padding:9px 6px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:transparent;
+  color:var(--text-2);
+  font-family:var(--font-body);
+  font-weight:600;
+  font-size:12px;
+  cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+.save-btn:hover{border-color:var(--accent-invest);color:var(--text-1);}
+.save-btn.danger:hover{border-color:var(--accent-warn);color:var(--accent-warn);}
+.save-status{
+  display:block;
+  min-height:15px;
+  margin-top:7px;
+  font-size:10.5px;
+  line-height:1.4;
+  color:var(--accent-good);
+  opacity:0;
+  transition:opacity .3s;
+  font-family:var(--font-mono);
+}
+.save-status.show{opacity:1;}
+.save-status.error{color:var(--accent-warn);}
+.save-status.muted{color:var(--text-dim);}
+
+/* ---------- Main ---------- */
+.dashboard{padding:30px 34px 60px;min-width:0;}
+.dashboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:6px;}
+.page-title-row{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.page-title{
+  font-family:var(--font-display);
+  font-weight:900;
+  font-size:24px;
+  margin:0 0 4px;
+  letter-spacing:.01em;
+}
+.loaded-param-file{
+  display:inline-block;
+  padding:2px 8px;
+  margin-bottom:6px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  color:var(--text-2);
+  font-family:var(--font-mono);
+  font-size:11px;
+  line-height:1.4;
+  max-width:min(100%, 560px);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.loaded-param-file:empty{display:none;}
+.page-sub{color:var(--text-2);font-size:13px;margin-bottom:26px;}
+.pdf-btn{
+  flex-shrink:0;
+  padding:9px 14px;
+  border:1px solid var(--border);
+  border-radius:9px;
+  background:transparent;
+  color:var(--text-2);
+  font-family:var(--font-body);
+  font-weight:600;
+  font-size:12px;
+  cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+.pdf-btn:hover{border-color:var(--accent-invest);color:var(--text-1);}
+.head-actions{display:flex;gap:8px;flex-shrink:0;}
+
+.print-only{display:none;}
+
+/* 列数はカード枚数に応じて JS が --stat-count を書き換える。インラインstyleではなく
+   カスタムプロパティにしておくことで、狭い画面ではメディアクエリ側の指定が勝つ */
+.stat-row{
+  display:grid;
+  grid-template-columns:repeat(var(--stat-count,4),1fr);
+  gap:14px;
+  margin-bottom:26px;
+}
+.stat-card{
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px 18px;
+  position:relative;
+  overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;top:0;left:0;width:100%;height:2px;
+  background:var(--stat-accent, var(--accent-invest));
+}
+.stat-label{font-size:11px;color:var(--text-2);letter-spacing:.03em;margin-bottom:8px;}
+.stat-value{font-family:var(--font-mono);font-weight:700;font-size:21px;color:var(--text-1);}
+.stat-value small{font-size:12px;color:var(--text-2);font-weight:500;}
+.stat-value.warn{color:var(--accent-warn);}
+.stat-value.good{color:var(--accent-good);}
+
+.chart-card{
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:22px 22px 10px;
+  margin-bottom:26px;
+}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:10px;}
+.chart-head h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:700;}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:11.5px;color:var(--text-2);font-family:var(--font-mono);}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+.swatch{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.swatch.dashed{
+  width:14px;height:0;border-radius:0;
+  border-top:2px dashed var(--accent-principal);
+}
+.chart-wrap{position:relative;height:380px;}
+.chart-wrap svg{width:100%;height:100%;display:block;overflow:visible;}
+.chart-wrap svg text{font-family:var(--font-mono);fill:var(--text-2);}
+.chart-tooltip{
+  position:absolute;
+  top:0;
+  left:0;
+  pointer-events:none;
+  background:var(--bg-panel-2);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:9px 12px;
+  font-family:var(--font-mono);
+  font-size:11.5px;
+  color:var(--text-1);
+  line-height:1.6;
+  opacity:0;
+  transform:translate(-9999px,-9999px);
+  transition:opacity .1s;
+  white-space:nowrap;
+  z-index:10;
+  box-shadow:0 8px 24px #00000066;
+}
+.chart-tooltip .tt-age{color:var(--text-2);font-weight:600;margin-bottom:3px;}
+.chart-tooltip .tt-cash{color:var(--accent-cash);}
+.chart-tooltip .tt-invest{color:var(--accent-invest);}
+.chart-tooltip .tt-principal{color:var(--accent-principal);}
+.chart-tooltip .tt-gain{color:var(--accent-good);}
+.chart-tooltip .tt-gain.neg{color:var(--accent-warn);}
+.chart-tooltip .tt-total{color:var(--chart-total-line);font-weight:700;border-top:1px solid var(--border-soft);margin-top:4px;padding-top:4px;}
+.chart-tooltip .tt-salary{color:var(--income-salary);}
+.chart-tooltip .tt-postret{color:var(--income-postret);}
+.chart-tooltip .tt-dc{color:var(--income-dc);}
+.chart-tooltip .tt-pension{color:var(--income-pension);}
+.chart-tooltip .tt-kakyu{color:var(--income-kakyu);}
+.chart-tooltip .tt-pension-partner{color:var(--income-pension-partner);}
+.chart-tooltip .tt-survivor{color:var(--income-survivor);}
+/* 取り崩しの段は投資資産の内訳グラフと同じ薄い灰色。文字色にそのまま使うとライトモードで読みづらいため text-2 を使う */
+.chart-tooltip .tt-drawdown{color:var(--text-2);}
+.chart-tooltip .tt-expense{color:var(--income-expense);border-top:1px solid var(--border-soft);margin-top:4px;padding-top:4px;}
+.chart-tooltip .tt-total-expense{color:var(--income-total-expense);}
+.chart-tooltip .tt-nisa{color:var(--invest-nisa);}
+.chart-tooltip .tt-taxable{color:var(--invest-taxable);}
+.chart-tooltip .tt-invgain{color:var(--invest-gain);}
+.chart-tooltip .tt-invgain.neg{color:var(--accent-warn);}
+/* 取り崩しの段は薄い灰色。文字色にそのまま使うとライトモードで読みづらいため text-2 を使う */
+.chart-tooltip .tt-invdrawdown{color:var(--text-2);}
+.chart-tooltip .tt-invtax{color:var(--invest-gain-tax);}
+.chart-tooltip .tt-spot{color:var(--accent-warn);}
+.chart-tooltip .tt-note{color:var(--text-dim);}
+
+.table-card{
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px 4px 4px;
+}
+.table-head{display:flex;justify-content:space-between;align-items:center;padding:0 18px 14px;}
+.table-head h2{font-family:var(--font-display);font-size:15px;margin:0;font-weight:700;}
+.table-note{font-size:11px;color:var(--text-dim);}
+.table-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.sheets-btn{
+  padding:7px 10px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:transparent;
+  color:var(--text-2);
+  font-family:var(--font-body);
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+  transition:border-color .15s,color .15s,background .15s;
+}
+.sheets-btn:hover{border-color:var(--accent-good);color:var(--text-1);background:var(--bg-panel-2);}
+.sheets-status{font-size:10.5px;color:var(--accent-good);min-height:1em;}
+.sheets-status.error{color:var(--accent-warn);}
+/* 横スクロールできることが分かりにくいので、狭い画面のときだけ添える(表示はメディアクエリ側) */
+.scroll-hint{display:none;color:var(--accent-cash);}
+
+.table-scroll{max-height:460px;overflow:auto;padding:0 4px 14px;}
+table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11.5px;white-space:nowrap;}
+thead th{
+  position:sticky;top:0;
+  background:var(--bg-panel-2);
+  color:var(--text-2);
+  font-weight:600;
+  text-align:right;
+  padding:9px 12px;
+  border-bottom:1px solid var(--border);
+  font-size:10.5px;
+  letter-spacing:.02em;
+}
+thead th:first-child, tbody td:first-child{text-align:left;position:sticky;left:0;background:var(--bg-panel-2);z-index:2;}
+tbody td{
+  text-align:right;
+  padding:7px 12px;
+  border-bottom:1px solid var(--border-soft);
+  color:var(--text-1);
+}
+tbody tr:hover td{background:var(--table-hover-bg);}
+td .tax-sub{color:var(--text-dim);font-size:10.5px;}
+tr.row-drawdown td{box-shadow: inset 0 -1px 0 var(--accent-warn);}
+tr.row-drawdown td:first-child{color:var(--accent-warn);font-weight:700;}
+tr.row-depleted td{background:var(--table-depleted-bg) !important;}
+td.neg{color:var(--accent-warn);}
+td[data-col]{cursor:help;}
+.table-tooltip{position:fixed;}
+.chart-tooltip .tt-total.neg{color:var(--accent-warn);}
+
+.footnote{
+  font-size:11.5px;
+  color:var(--text-dim);
+  line-height:1.7;
+  margin-top:22px;
+  padding:16px 18px;
+  border:1px dashed var(--border);
+  border-radius:10px;
+}
+.footnote b{color:var(--text-2);}
+
+/* ---------- 税率モーダル ---------- */
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  background:#05080Ecc;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:100;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s;
+}
+.modal-backdrop.show{opacity:1;pointer-events:auto;}
+.modal{
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  max-width:640px;
+  width:100%;
+  max-height:86vh;
+  overflow-y:auto;
+  box-shadow:0 20px 60px #000000aa;
+}
+.modal-head{
+  position:sticky;
+  top:0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:18px 22px;
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border);
+}
+.modal-head h2{font-family:var(--font-display);font-size:15.5px;margin:0;font-weight:700;}
+.modal-close{
+  border:none;
+  background:transparent;
+  color:var(--text-2);
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  padding:6px 9px;
+  border-radius:6px;
+  flex-shrink:0;
+}
+.modal-close:hover{color:var(--text-1);background:var(--bg-panel-2);}
+.modal-body{padding:20px 22px 26px;}
+.rate-section{margin-bottom:22px;}
+.rate-section:last-child{margin-bottom:0;}
+.rate-section h3{
+  font-family:var(--font-display);
+  font-size:12.5px;
+  font-weight:700;
+  color:var(--accent-invest);
+  margin:0 0 8px;
+}
+.rate-section p{font-size:11.5px;color:var(--text-2);line-height:1.7;margin:0 0 8px;}
+.rate-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px;margin-bottom:4px;}
+.rate-table th{
+  text-align:right;
+  color:var(--text-2);
+  font-weight:600;
+  padding:6px 8px;
+  border-bottom:1px solid var(--border);
+  font-size:10px;
+}
+.rate-table th:first-child, .rate-table td:first-child{text-align:left;}
+.rate-table td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--border-soft);color:var(--text-1);}
+.rate-current{
+  display:inline-block;
+  margin-top:2px;
+  padding:6px 10px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-family:var(--font-mono);
+  font-size:11.5px;
+  color:var(--accent-good);
+}
+
+/* ---------- 支出内訳モーダル ---------- */
+.expense-cat-total{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-top:10px;
+  padding:10px 14px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-family:var(--font-mono);
+  font-size:12.5px;
+  color:var(--text-2);
+}
+.expense-cat-total-annual{
+  border-color:var(--accent-invest);
+  color:var(--text-1);
+  font-size:14px;
+  font-weight:700;
+}
+.expense-cat-total-annual span:last-child{color:var(--accent-invest);}
+.modal-actions{margin-top:18px;display:flex;justify-content:flex-end;}
+.modal-actions .run-btn{width:auto;padding:11px 20px;font-size:12.5px;}
+
+/* ---------- 印刷用サマリー(入力パラメータ) ---------- */
+.print-summary{
+  background:var(--bg-panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px 22px;
+  margin-bottom:26px;
+}
+.print-summary h2{font-family:var(--font-display);font-size:14px;margin:0 0 4px;font-weight:700;}
+.print-summary .print-date{font-size:11px;color:var(--text-dim);margin-bottom:14px;font-family:var(--font-mono);}
+.print-summary-group{margin-bottom:12px;}
+.print-summary-group:last-child{margin-bottom:0;}
+.print-summary-group h3{
+  font-family:var(--font-mono);
+  font-size:10px;
+  letter-spacing:.08em;
+  color:var(--accent-invest);
+  text-transform:uppercase;
+  margin:0 0 6px;
+}
+.print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 16px;}
+.print-item{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:3px 0;border-bottom:1px solid var(--border-soft);}
+.print-item .print-label{color:var(--text-2);}
+.print-item .print-value{font-family:var(--font-mono);color:var(--text-1);white-space:nowrap;}
+
+@media (max-width:1180px){
+  .stat-row{grid-template-columns:repeat(min(var(--stat-count,4),4),1fr);}
+}
+
+@media (max-width:920px){
+  .app{grid-template-columns:1fr;}
+  .panel{position:relative;height:auto;overflow:visible;border-right:none;border-bottom:1px solid var(--border);min-width:0;}
+  .panel-fixed{position:sticky;top:0;z-index:5;}
+  .panel-scroll{overflow:visible;}
+  .stat-row{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .dashboard{padding:24px 16px 40px;}
+
+  /* iOS Safari は font-size が16px未満の入力欄をタップすると自動でズームするため、16pxまで上げる */
+  .field input[type=number], .field input[type=text], .field select{font-size:16px;padding:10px 10px;}
+  .field-row.three .field input{font-size:15px;padding:10px 6px;}
+
+  /* タップしやすいサイズを確保する */
+  .checkline{min-height:36px;gap:10px;}
+  .checkline input{width:20px;height:20px;flex-shrink:0;}
+  .spot-del{padding:8px 10px;font-size:14px;}
+  .save-btn{padding:13px 6px;}
+  .pdf-btn{padding:11px 14px;}
+  .rate-btn{padding:9px 12px;}
+  .save-row{flex-wrap:wrap;}
+
+  .page-title{font-size:20px;}
+  .page-sub{font-size:12px;margin-bottom:20px;}
+  .chart-card{padding:16px 12px 8px;}
+  .chart-head h2{font-size:14px;}
+  .legend{gap:10px;font-size:10.5px;}
+  .chart-wrap{height:300px;}
+  .stat-card{padding:13px 14px;}
+  .stat-value{font-size:18px;}
+
+  .table-card{padding:16px 4px 4px;}
+  .table-head{flex-direction:column;align-items:flex-start;gap:6px;padding:0 14px 12px;}
+  .table-actions{justify-content:flex-start;}
+  .table-scroll{max-height:420px;-webkit-overflow-scrolling:touch;}
+  .scroll-hint{display:inline;}
+  .footnote{font-size:11px;padding:14px;}
+  .print-grid{grid-template-columns:1fr;}
+}
+
+
+/* この@media printブロックはスタイルシートの末尾に置くこと。CSSのカスケードは
+   同一詳細度なら記述順で後勝ちのため、途中に置くと後続の通常ルール(.table-scrollなど)に
+   上書きされてしまう */
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  @page{margin:12mm;}
+  body{background:var(--bg-void);}
+  .no-print, .panel, .chart-tooltip, .modal-backdrop{display:none !important;}
+  .app{display:block;}
+  .dashboard{padding:0;}
+  .print-only{display:block;}
+  .chart-card, .stat-card, .table-card{break-inside:avoid;}
+  .table-scroll{max-height:none;overflow:visible;}
+  thead th{position:static;}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel">
+    <div class="panel-fixed">
+      <button class="run-btn" id="calcBtn">シミュレーション実行 →</button>
+      <div class="save-row" style="margin-top:8px;">
+        <button class="save-btn" id="expandAllBtn" type="button">すべて展開</button>
+        <button class="save-btn" id="collapseAllBtn" type="button">すべて折りたたむ</button>
+      </div>
+    </div>
+    <div class="panel-scroll">
+    <button class="rate-btn" id="rateBtn" type="button">税率を確認</button>
+    <div class="brand"><span class="dot"></span>ASSET PROJECTION</div>
+    <div class="brand-sub">退職後資産シミュレーター</div>
+
+    <div class="group">
+      <div class="group-title">基本情報</div>
+      <div class="field-row">
+        <div class="field"><label>現在の年齢<span class="unit">歳</span></label><input type="number" id="currentAge" value="55"></div>
+        <div class="field"><label>試算終了年齢<span class="unit">歳</span></label><input type="number" id="simEndAge" value="95"></div>
+      </div>
+      <div class="field"><label>退職年齢(給与終了)<span class="unit">歳</span></label><input type="number" id="retirementAge" value="65"></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">収入・給与</div>
+      <div class="field"><label>現在の年収(〜60歳)<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="salaryPhase1" value=""></div>
+      <div class="field-row">
+        <div class="field"><label>年収変更年齢<span class="unit">歳</span></label><input type="number" id="salaryPhase2StartAge" value="60"></div>
+        <div class="field"><label>継続雇用の年収<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="salaryPhase2" value=""></div>
+      </div>
+      <div class="field"><label>退職後の少額収入<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="postRetIncome" value="0"></div>
+      <div class="field-row">
+        <div class="field"><label>開始年齢<span class="unit">歳</span></label><input type="number" id="postRetIncomeStartAge" value="65"></div>
+        <div class="field"><label>継続年数<span class="unit">年</span></label><input type="number" id="postRetIncomeYears" value="5"></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">給与所得として、他の給与と合算して課税します</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">退職金(一時金)</div>
+      <div class="field-row">
+        <div class="field"><label>退職金額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="lumpSum" value=""></div>
+        <div class="field"><label>受取り年齢<span class="unit">歳</span></label><input type="number" id="lumpSumAge" value="65"></div>
+      </div>
+      <div class="field"><label>勤続年数(退職所得控除用)<span class="unit">年</span></label><input type="number" id="serviceYears" value=""></div>
+      <div class="field"><label>受取時の現金配分比率<span class="unit">%</span></label><input type="number" id="lumpSumCashRatio" value="20" step="5" min="0" max="100"></div>
+      <div class="table-note" style="padding:0 0 2px;">税引後の退職金のうち、上記%を現金へ、残りを運用へ即時配分します</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">DC(確定拠出年金)・年金受取</div>
+      <div class="field"><label>DC総額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="dcTotal" value=""></div>
+      <div class="field-row">
+        <div class="field"><label>受取開始年齢<span class="unit">歳</span></label><input type="number" id="dcStartAge" value="65"></div>
+        <div class="field"><label>受取年数<span class="unit">年</span></label><input type="number" id="dcYears" value="10"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">公的年金</div>
+      <div class="field-row">
+        <div class="field"><label>本人の老齢基礎年金<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="primaryBasicPension" value=""></div>
+        <div class="field"><label>本人の老齢厚生年金<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="primaryKouseiPension" value=""></div>
+      </div>
+      <div class="field"><label>受給開始年齢<span class="unit">歳</span></label><input type="number" id="pensionStartAge" value="65"></div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="primarySurvivorEligible" checked> 本人の厚生年金加入期間が25年以上ある(遺族厚生年金の発生要件)</label>
+      <div class="field-row" style="margin-top:9px;">
+        <div class="field"><label>パートナーの老齢基礎年金<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="partnerBasicPension" value=""></div>
+        <div class="field"><label>パートナーの老齢厚生年金<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="partnerKouseiPension" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>本人との年齢差<span class="unit">歳(年上が+)</span></label><input type="number" id="partnerAgeDiff" value="0" step="1"></div>
+        <div class="field"><label>パートナー受給開始<span class="unit">歳</span></label><input type="number" id="partnerPensionStartAge" value="65"></div>
+      </div>
+      <label class="checkline"><input type="checkbox" id="partnerSurvivorEligible"> パートナーの厚生年金加入期間が25年以上ある(遺族厚生年金の発生要件)</label>
+      <div class="table-note" style="padding:4px 0 2px;">老齢基礎年金・老齢厚生年金は年次内訳・グラフでは合算した「公的年金」として表示します(厚生年金の内訳は遺族厚生年金の計算にのみ使用)。年齢差はパートナーが年上なら+、年下ならマイナスで入力します(パートナーの年齢=本人の年齢+年齢差)。受給開始年齢はパートナー自身の年齢で指定し、本人と同じく繰上げ・繰下げによる年額の増減を反映します。パートナーの年金は別世帯主体として本人とは別に確定申告する前提で課税額を計算します(公的年金等控除・配偶者控除の年齢判定には上記の年齢差から求めたパートナーの実年齢を使用)</div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applyPensionAdjust" checked> 繰上げ・繰下げ受給による年額の増減を自動調整する</label>
+      <div class="table-note" id="pensionAdjustNote" style="padding:6px 0 2px;"></div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applyKakyuNenkin"> 加給年金を追加する</label>
+      <div class="field"><label>加給年金額(配偶者、年額)<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="kakyuNenkinAmount" value="408100"></div>
+      <label class="checkline"><input type="checkbox" id="kakyuNenkinEligible"> 厚生年金の加入期間が20年以上ある(受給要件)</label>
+      <div class="table-note" style="padding:4px 0 2px;">本人の受給開始後、パートナーが65歳になるまでの間、本人の公的年金に上乗せします。子の加算・振替加算・在職老齢年金による支給停止は考慮していません</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">死亡・遺族年金</div>
+      <label class="checkline"><input type="checkbox" id="applyPrimaryDeath"> 本人の死亡年齢を設定する</label>
+      <div class="field"><label>本人の死亡年齢<span class="unit">歳</span></label><input type="number" id="primaryDeathAge" value="85"></div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applyPartnerDeath"> パートナーの死亡年齢を設定する</label>
+      <div class="field"><label>パートナーの死亡年齢<span class="unit">歳(パートナー自身の年齢)</span></label><input type="number" id="partnerDeathAge" value="85"></div>
+      <div class="table-note" id="partnerDeathAgeNote" style="padding:2px 0 2px;"></div>
+      <div class="table-note" style="padding:4px 0 2px;">死亡した人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)は、その年から0になります。生存側の支出はこれまでと変更しません。本人・パートナーの両方が死亡した年より後は試算を打ち切ります</div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applySurvivorPension"> 遺族厚生年金を計算に含める</label>
+      <div class="table-note" style="padding:4px 0 2px;">生存側は「自分の老齢基礎年金+老齢厚生年金」を全額受け取ったうえで、死亡した人の老齢厚生年金額の3/4と、(死亡した人の老齢厚生年金額+生存側自身の老齢厚生年金額)の1/2のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を、遺族厚生年金として非課税で上乗せします(死亡した人が「公的年金」欄の受給要件チェックを満たす場合のみ発生)。中高齢寡婦加算・65歳以降の受給調整・遺族基礎年金(子がいる場合)は考慮していません</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">支出</div>
+      <div class="field-row">
+        <div class="field"><label>年間支出<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="annualExpense" value=""></div>
+        <div class="field"><label>支出上昇率<span class="unit">%/年</span></label><input type="number" id="inflationRate" value="1.0" step="0.1"></div>
+      </div>
+      <button class="sheets-btn" id="expenseBreakdownBtn" type="button" style="margin-top:9px;">月次の科目別に計算する</button>
+    </div>
+
+    <div class="group">
+      <div class="group-title">ライフステージ・リスク設定</div>
+
+      <div class="sub-title">年齢帯別の支出倍率</div>
+      <div class="field-row three">
+        <div class="field"><label>〜74歳<span class="unit">%</span></label><input type="number" id="expenseRatioUnder75" value="100" step="5" min="0"></div>
+        <div class="field"><label>75〜84歳<span class="unit">%</span></label><input type="number" id="expenseRatio75to84" value="85" step="5" min="0"></div>
+        <div class="field"><label>85歳〜<span class="unit">%</span></label><input type="number" id="expenseRatio85plus" value="90" step="5" min="0"></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">「支出」欄の年間支出(物価上昇率を適用した後の額)に、その年の年齢に応じた倍率を掛けて年間支出を算出します(活動量が落ちる後期高齢期は減少、85歳以降は医療・介護費の増加を想定して再び上昇、という一般的なパターンが初期値です)</div>
+
+      <div class="sub-title">スポット(一時的)支出<span style="font-weight:400;color:var(--text-dim);"> 最大3件</span></div>
+      <div id="spotList">
+        <div class="spot-row" data-spot="1">
+          <div class="spot-head"><span>スポット支出 1</span><button type="button" class="spot-del" data-spot="1" aria-label="スポット支出1をクリア">✕</button></div>
+          <div class="field"><label>イベント名<span class="unit">任意</span></label><input type="text" id="spotName1" value="" placeholder="例: 自宅リフォーム"></div>
+          <div class="field-row">
+            <div class="field"><label>発生年齢<span class="unit">歳</span></label><input type="number" id="spotAge1" value=""></div>
+            <div class="field"><label>支出額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="spotAmount1" value=""></div>
+          </div>
+          <label class="checkline"><input type="checkbox" id="spotInflate1"> 物価上昇率を適用する</label>
+        </div>
+        <div class="spot-row" data-spot="2" hidden>
+          <div class="spot-head"><span>スポット支出 2</span><button type="button" class="spot-del" data-spot="2" aria-label="スポット支出2を削除">✕</button></div>
+          <div class="field"><label>イベント名<span class="unit">任意</span></label><input type="text" id="spotName2" value="" placeholder="例: 車の買い替え"></div>
+          <div class="field-row">
+            <div class="field"><label>発生年齢<span class="unit">歳</span></label><input type="number" id="spotAge2" value=""></div>
+            <div class="field"><label>支出額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="spotAmount2" value=""></div>
+          </div>
+          <label class="checkline"><input type="checkbox" id="spotInflate2"> 物価上昇率を適用する</label>
+        </div>
+        <div class="spot-row" data-spot="3" hidden>
+          <div class="spot-head"><span>スポット支出 3</span><button type="button" class="spot-del" data-spot="3" aria-label="スポット支出3を削除">✕</button></div>
+          <div class="field"><label>イベント名<span class="unit">任意</span></label><input type="text" id="spotName3" value="" placeholder="例: 子への住宅資金援助"></div>
+          <div class="field-row">
+            <div class="field"><label>発生年齢<span class="unit">歳</span></label><input type="number" id="spotAge3" value=""></div>
+            <div class="field"><label>支出額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="spotAmount3" value=""></div>
+          </div>
+          <label class="checkline"><input type="checkbox" id="spotInflate3"> 物価上昇率を適用する</label>
+        </div>
+      </div>
+      <button class="save-btn spot-add" id="spotAddBtn" type="button">＋ スポット支出を追加</button>
+      <div class="table-note" style="padding:6px 0 2px;">指定した年齢の年に一度だけ支出へ加算します(発生年齢と支出額の両方が入力された行のみ有効)。「物価上昇率を適用する」をONにすると、入力額を現在価値とみなして発生年までの物価上昇分を上乗せします</div>
+
+      <div class="sub-title">年齢帯別の運用利回り(グライドパス)</div>
+      <label class="checkline" style="margin:0 0 9px;"><input type="checkbox" id="useGlidePath" checked> 年齢に応じて運用利回りを切り替える</label>
+      <div class="field-row three">
+        <div class="field"><label>〜65歳<span class="unit">%/年</span></label><input type="number" id="returnRateUnder65" value="3.5" step="0.1"></div>
+        <div class="field"><label>66〜75歳<span class="unit">%/年</span></label><input type="number" id="returnRate66to75" value="2.5" step="0.1"></div>
+        <div class="field"><label>76歳〜<span class="unit">%/年</span></label><input type="number" id="returnRate76plus" value="1.5" step="0.1"></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">年齢が上がるにつれてリスク資産の比率を下げていく想定です。OFFにすると「資産・運用」欄の運用利回りを全年齢に一律適用します</div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">社会保険料・追加控除</div>
+      <label class="checkline" style="margin-bottom:9px;"><input type="checkbox" id="applyExtraDeductions" checked> 社会保険料・医療費控除・配偶者控除を計算に含める</label>
+      <div class="field-row">
+        <div class="field"><label>現役時代の社会保険料率<span class="unit">%(給与)</span></label><input type="number" id="workingInsuranceRate" value="15" step="0.5" min="0" max="100"></div>
+        <div class="field"><label>退職後の国保・介護保険料<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="retiredInsuranceAnnual" value=""></div>
+      </div>
+      <div class="field"><label>年間医療費(本人+パートナー合算)<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="medicalExpenseAnnual" value="0"></div>
+      <div class="table-note" style="padding:4px 0 2px;">社会保険料・国保/介護保険料は、税額控除としてだけでなく実際の支出としても収支に反映されます(現役時代は給与×料率、退職後は年額を物価上昇率で調整)</div>
+      <label class="checkline"><input type="checkbox" id="hasSpouseDeduction"> 配偶者控除の対象となる配偶者がいる(パートナーの年金額から自動判定)</label>
+    </div>
+
+    <div class="group">
+      <div class="group-title">資産・運用</div>
+      <div class="field-row">
+        <div class="field"><label>現在の運用資産<span class="unit">円</span></label><input type="text" inputmode="numeric" id="investStart" value=""></div>
+        <div class="field"><label>現在の現金<span class="unit">円</span></label><input type="text" inputmode="numeric" id="cashStart" value=""></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>運用利回り<span class="unit">%/年</span></label><input type="number" id="investReturnRate" value="3.0" step="0.1"></div>
+        <div class="field"><label>現金保有目標<span class="unit">円</span></label><input type="text" inputmode="numeric" id="cashTargetAmount" value=""></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">運用利回りは「ライフステージ・リスク設定」のグライドパスがOFFのときに使用します(ONのときは年齢帯別の利回りが優先されます)</div>
+      <div class="field">
+        <label>取り崩し時の元本の減らし方<span class="unit">グラフの点線</span></label>
+        <select id="principalMethod">
+          <option value="prorata">比例配分(平均取得単価方式)</option>
+          <option value="gainsFirst">運用益から先に取り崩す</option>
+        </select>
+        <div class="table-note" style="padding:4px 0 0;">実際の特定口座は総平均法なので、運用益課税を有効にする場合は「比例配分」が実態に近くなります</div>
+      </div>
+      <label class="checkline"><input type="checkbox" id="maintainCashTarget"> 現金保有目標を下回ったら運用資産から取り崩して補充する</label>
+      <label class="checkline"><input type="checkbox" id="applyTax" checked> 税金(所得税・住民税)を概算適用する</label>
+    </div>
+
+    <div class="group">
+      <div class="group-title">NISA・運用益課税</div>
+      <label class="checkline" style="margin-bottom:9px;"><input type="checkbox" id="applyGainsTax" checked> 特定口座分の運用益に課税する</label>
+      <div class="field-row">
+        <div class="field"><label>NISA年間投資枠<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="nisaAnnualLimit" value="3600000"></div>
+        <div class="field"><label>NISA生涯投資枠<span class="unit">円</span></label><input type="text" inputmode="numeric" id="nisaLifetimeLimit" value="18000000"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>現在の運用資産のうちNISA分<span class="unit">円</span></label><input type="text" inputmode="numeric" id="nisaStart" value="0"></div>
+        <div class="field"><label>運用益の税率<span class="unit">%</span></label><input type="number" id="gainsTaxRate" value="20.315" step="0.001"></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">取り崩しは特定口座から先に行い、売却益に課税します(NISAはできるだけ最後まで残します)</div>
+      <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="nisaPriority" checked> NISA枠を優先して埋める(運用へ回す資金をまずNISAの空き枠に入れる)</label>
+      <label class="checkline"><input type="checkbox" id="nisaPacedInvesting"> NISA年間枠に沿って積立(超過分は特定口座へ回さず翌年以降に繰り越す)</label>
+      <label class="checkline"><input type="checkbox" id="nisaRelay"> 特定口座からNISAへ毎年移し替える(年間枠の空き分だけ売却して買い直す)</label>
+      <div class="table-note" style="padding:6px 0 2px;">「NISA枠を優先して埋める」をOFFにすると、運用へ回す資金は全額が特定口座になります(下2つの設定は無効になります)。「特定口座からNISAへ毎年移し替える」をONにすると、新たに投資へ回す資金がない年でも、NISA年間枠の空き分だけ特定口座を売却してNISAで買い直し、生涯投資枠を使い切るまで移していきます(売却時に運用益課税がかかる代わりに、以降の運用益が非課税になります)</div>
+    </div>
+
+    <div class="save-row">
+      <button class="save-btn" id="saveBtn">入力内容を保存</button>
+      <button class="save-btn" id="loadBtn">保存内容を復元</button>
+      <button class="save-btn danger" id="resetBtn">初期値</button>
+    </div>
+    <div class="save-row">
+      <button class="save-btn" id="exportFileBtn">ファイルに保存</button>
+      <button class="save-btn" id="importFileBtn">ファイルから読込</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+    </div>
+    <span class="save-status" id="saveStatus"></span>
+    </div>
+  </aside>
+
+  <main class="dashboard">
+    <div class="dashboard-head">
+      <div>
+        <div class="page-title-row">
+          <h1 class="page-title">退職後資産シミュレーター</h1>
+          <span class="loaded-param-file" id="loadedParamFileName" aria-live="polite"></span>
+        </div>
+        <p class="page-sub">給与・退職金・DC年金・公的年金(本人・パートナー)の受取と、税金・支出を考慮した資産(運用+現金)の年次推移</p>
+      </div>
+      <div class="head-actions no-print">
+        <button class="pdf-btn" id="themeBtn" type="button">ライトモード</button>
+        <button class="pdf-btn" id="pdfBtn" type="button">PDFレポート出力</button>
+      </div>
+    </div>
+
+    <div class="print-summary print-only" id="printSummary"></div>
+
+    <div class="stat-row" id="statRow"></div>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <h2>資産推移(運用資産 / 現金残高)</h2>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--accent-cash)"></span>現金</span>
+          <span><span class="swatch" style="background:var(--accent-invest)"></span>運用資産</span>
+          <span><span class="swatch dashed"></span>運用元本</span>
+          <span><span class="swatch" style="background:#fff"></span>合計資産</span>
+        </div>
+      </div>
+      <div class="chart-wrap" id="chartWrap">
+        <div class="chart-tooltip" id="chartTooltip"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <h2>投資資産の内訳(NISA枠 / 特定口座 / 運用益 / 取り崩し / 運用益課税)</h2>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--invest-nisa)"></span>NISA枠(元本)</span>
+          <span><span class="swatch" style="background:var(--invest-taxable)"></span>特定口座(元本)</span>
+          <span><span class="swatch" style="background:var(--invest-gain)"></span>運用益</span>
+          <span><span class="swatch" style="background:var(--invest-drawdown)"></span>取り崩し(売却手取り)</span>
+          <span><span class="swatch" style="background:var(--invest-gain-tax)"></span>運用益課税</span>
+        </div>
+      </div>
+      <div class="chart-wrap" id="investChartWrap">
+        <div class="chart-tooltip" id="investChartTooltip"></div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-head">
+        <h2>収入内訳(給与 / 少額収入 / DC年金 / 公的年金 / 取り崩し)</h2>
+        <div class="legend">
+          <span><span class="swatch" style="background:var(--income-salary)"></span>給与</span>
+          <span><span class="swatch" style="background:var(--income-postret)"></span>少額収入</span>
+          <span><span class="swatch" style="background:var(--income-dc)"></span>DC年金</span>
+          <span><span class="swatch" style="background:var(--income-pension)"></span>公的年金(本人)</span>
+          <span><span class="swatch" style="background:var(--income-kakyu)"></span>加給年金</span>
+          <span><span class="swatch" style="background:var(--income-pension-partner)"></span>公的年金(パートナー)</span>
+          <span><span class="swatch" style="background:var(--income-survivor)"></span>遺族厚生年金</span>
+          <span><span class="swatch" style="background:var(--invest-drawdown)"></span>取り崩し</span>
+          <span><span class="swatch dashed" style="border-top-color:var(--income-expense)"></span>年間支出(生活費)</span>
+          <span><span class="swatch dashed" style="border-top-color:var(--income-total-expense)"></span>支出+保険料+税金(実質支出)</span>
+          <span><span class="swatch" style="background:var(--accent-warn);border-radius:50%;"></span>スポット支出のある年</span>
+        </div>
+      </div>
+      <div class="chart-wrap" id="incomeChartWrap">
+        <div class="chart-tooltip" id="incomeChartTooltip"></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-head">
+        <h2>年次内訳</h2>
+        <div class="table-actions">
+          <div class="table-note">オレンジ線=取り崩し開始年齢　/　税額はすべて概算<span class="scroll-hint">　表は横にスクロールできます →</span></div>
+          <button class="sheets-btn" id="exportSheetsBtn" type="button">Google スプレッドシートへ出力</button>
+          <span class="sheets-status" id="sheetsStatus" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>年齢</th><th>給与</th><th>少額収入</th><th>退職金</th><th>DC年金</th><th>公的年金</th>
+              <th>支出(内 保険料)</th><th>内 スポット支出</th><th>税金計(内 運用益)</th><th>純CF</th><th>現金残高</th><th>運用残高</th><th>総資産</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="chart-tooltip table-tooltip" id="tableTooltip"></div>
+    </div>
+
+    <div class="footnote">
+      <b>試算の前提について:</b> 税額は令和8年(2026年)分の税制を簡易的に適用した概算です(給与所得控除・公的年金等控除・基礎控除・所得税速算表・住民税10%+均等割を使用)。社会保険料控除・医療費控除・配偶者控除は「社会保険料・追加控除」欄で計算に含めるかどうかを選べます(下記参照)。それ以外の控除(扶養控除、iDeCoの掛金控除など)は考慮していません。退職金は分離課税・1/2課税、DC・公的年金は総合課税の雑所得として計算しています。退職後の少額収入は給与所得として、他の給与と合算して給与所得控除・総合課税を適用します(開始年齢〜継続年数の期間のみ加算し、収支は現金保有目標に基づき自動でリバランスされます)。パートナーの年金は本人とは別世帯主体として個別に確定申告する前提で課税額を計算しています(パートナーの年齢は「本人との年齢差」から求めた実年齢を使用。社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用し、パートナー自身の申告には適用していません)。退職一時金は税引後の金額を「受取時の現金配分比率」に従って現金と運用資産へ即時に振り分け、以降の毎年の収支(給与・DC・年金-税金-社会保険料-支出)は現金保有目標(円、固定額・物価上昇による自動調整はなし)に基づき別途自動でリバランスされます。実際の税額・手取りとは差異が生じますので、正式な判断には税理士等にご確認ください。運用資産の利回りは一定率で複利計算しており、市場変動リスクは反映していません。<br><b>グラフの点線(運用元本)について:</b> 運用資産へ投じた累計額(運用益を含まない金額)を、現金残高の上に積んだ位置に表示しています。したがって<b>点線と白い合計ラインの差が、その時点の運用損益(含み益)</b>にあたります。取り崩し時に元本をどう減らすかは左側の「取り崩し時の元本の減らし方」で切り替えられます(比例配分=残高に占める元本と運用益の比率で按分、運用益から先に取り崩す=運用益を使い切ってから元本に手をつける)。<br><b>NISA・運用益課税について:</b> 「NISA枠を優先して埋める」(既定ON)の場合、運用へ回す資金は毎年、NISAの年間投資枠(既定360万円)と生涯投資枠(既定1,800万円)の空きに優先して入り、入りきらない分が特定口座になります(OFFにすると、NISAへは新規に投資せず全額が特定口座になります)。枠はいずれも簿価(取得額)ベースで管理し、NISAを売却した場合はその簿価分の生涯枠が翌年に復活します。取り崩しは特定口座から先に行い、売却益に対して既定20.315%(所得税15.315%+住民税5%)を課税します。源泉徴収と同じく税引後の手取りが必要額になるよう売却額を割り戻しているため、課税口座の含み益が大きいほど多く売却することになります。この運用益課税は年次内訳の「税金計」に<b>内数</b>(カッコ内)として含めています。なお、譲渡損失の繰越控除、配当・分配金への課税、NISAの成長投資枠1,200万円の内枠、金融商品の売却順序の最適化は考慮していません。「NISA年間枠に沿って積立」をONにすると、その年のNISA年間枠に入りきらない投資資金は特定口座へ回さず現金として保有し、翌年以降にNISA年間枠が空き次第優先的に投資します(現金保有目標を上回った状態がしばらく続くことがあります)。ただしNISAの生涯投資枠を使い切った後は、それ以上NISAへ投資する余地がないため、通常どおり特定口座へ投資します。「特定口座からNISAへ毎年移し替える」(既定OFF)をONにすると、新たに投資へ回す資金がない年でも、毎年NISA年間枠の空き分だけ特定口座を売却し、税引後の手取りをそのままNISAで買い直します(いわゆるリレー投資)。退職後で追加の入金がない場合でも生涯投資枠を使い切るまでNISAへ移していけますが、移し替えのための売却でその都度、含み益に対して運用益課税がかかります(その代わり、移し替えた後の値上がり分は非課税になります)。移し替えは現金の増減を伴わないため、投資資産の内訳グラフの「取り崩し」には含めていません(売却で支払った税額は「運用益課税」に含まれます)。<br><b>投資資産の内訳グラフについて:</b> 下3段のNISA枠(元本)・特定口座(元本)・運用益(含み益)で、その年の運用残高(NISA+特定口座の合計)をちょうど分解しています。上2段の取り崩し(売却手取り)と運用益課税は、残高ではなくその年の<b>フロー</b>項目のため、取り崩しがあった年はバーの高さが残高よりその分高くなります。取り崩しの段は<b>その年に運用資産を売却して得た手取り</b>(売却総額-運用益課税)で、これを残高のすぐ上に積んでいるため、<b>その段の下端がその年の運用残高、上端が「取り崩さなければ残っていた額」の目安</b>になります。取り崩し(灰色)+運用益課税(赤)が、その年に運用資産から出ていった額です(通常はその年の売却総額と一致します。NISAへの移し替えを行った年は、移し替えた元本は運用資産の中に残るため灰色には含めず、移し替えで支払った税額だけが赤に含まれます)。なお、収入内訳グラフの「取り崩し」は<b>世帯の収支不足額</b>で、現金から補填した分も含むため、こちらの数字とは一致しません(現金だけで賄えた年はこのグラフの取り崩しは0になります)。含み損(運用益がマイナス)の年は、運用益の棒を0として表示します(実際の値はホバーのツールチップでご確認ください)。<br><b>社会保険料・医療費控除・配偶者控除について:</b> 「社会保険料・追加控除」欄のチェックボックスで、これらをまとめて計算に含めるかどうかを切り替えられます。健康保険・介護保険料等の社会保険料は、現役時代は給与に対する概算料率(既定15%)、退職後(給与終了後)は年額(既定40万円、物価上昇率で調整)で概算し、社会保険料控除として税額を軽減するだけでなく、実際の支出としても収支に反映します(年次内訳の「支出」列に内数で表示)。医療費控除は、入力した年間医療費(本人+パートナー合算を想定)から「10万円と総所得金額の5%の低い方」を差し引いた額(上限200万円)を、本人の総所得金額から控除します。配偶者控除は「配偶者控除の対象となる配偶者がいる」にチェックを入れた場合のみ適用し、パートナーの年金額(既存パラメータ)から配偶者の合計所得金額を自動判定します。配偶者の合計所得金額が48万円を超える場合は控除0とし、より複雑な配偶者特別控除(48万円超133万円以下で段階的に減る控除)は考慮していません。配偶者の年齢は「本人との年齢差」から求めた実年齢を使用します(70歳以上の場合の割増控除額の判定に使用)。社会保険料控除・医療費控除・配偶者控除はいずれも本人の確定申告にのみ適用し、パートナー自身の(別世帯主体としての)申告には適用していません。<br><b>ライフステージ・リスク設定について:</b> 年間支出は「年間支出×(1+支出上昇率)^経過年数×年齢帯別の支出倍率」で算出します(初期値は74歳まで100%、75〜84歳85%、85歳以降90%)。スポット(一時的)支出は最大3件まで登録でき、指定した年齢の年に一度だけ支出へ加算します(「物価上昇率を適用する」をONにした行は、入力額を現在価値とみなして発生年までの上昇分を上乗せします)。運用利回りは「年齢に応じて運用利回りを切り替える」がONの場合、65歳まで・66〜75歳・76歳以降の3段階(初期値3.5%/2.5%/1.5%)を年齢に応じて適用し、OFFの場合は「資産・運用」欄の運用利回りを全年齢に一律適用します。いずれも年齢による決め打ちの想定であり、実際の支出の推移や市場の変動を予測するものではありません。<br><b>公的年金の繰上げ・繰下げについて:</b> 「繰上げ・繰下げ受給による年額の増減を自動調整する」がONの場合、入力した年額を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます(繰上げ=1ヶ月あたり-0.4%・最大-24%、繰下げ=1ヶ月あたり+0.7%・最大+84%)。パートナーの年金にも同じ率を適用し、こちらはパートナー自身の受給開始年齢で判定します(受給が始まるのが本人の何歳のときかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は制度の上下限に丸めて計算します。在職老齢年金による支給停止は考慮していません。<br><b>加給年金について:</b> 「加給年金を追加する」(既定OFF)をONにすると、本人の厚生年金加入期間が20年以上ある(「受給要件」チェックボックスで指定)前提で、本人が65歳に達して年金を受給中(繰上げ受給を選んでいても加給年金自体は65歳より前には始まらず、繰下げ待機中も年金と同様に不支給です)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額(年額、既定40万8,100円・概算)を上乗せします。パートナーが65歳になった時点で打ち切られ、配偶者の年金に付く「振替加算」は考慮していません。子の加算、配偶者自身の所得や厚生年金加入期間による支給停止にも対応していません。<br><b>死亡・遺族厚生年金について:</b> 「本人の死亡年齢を設定する」「パートナーの死亡年齢を設定する」(既定OFF)をそれぞれONにすると、指定した年齢に達した年から、その人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)をすべて0として扱います(死亡年齢そのものの年も含む)。「遺族厚生年金を計算に含める」をONにすると、死亡した人について入力した老齢厚生年金相当額(報酬比例部分。基礎年金分は含めない)の3/4を、生存側に非課税(所得税・住民税とも課税対象外)で毎年上乗せします。中高齢寡婦加算(現行制度では40〜64歳の妻のみが対象で、このアプリは性別を管理していないため非対応)、65歳以降に生存側自身の老齢厚生年金と遺族厚生年金を調整する仕組み、遺族基礎年金(子のある配偶者・子のみが対象で、このアプリは子を考慮していないため非対応)、支給要件(保険料納付済期間など)の判定は考慮していません。配偶者控除は、パートナーが死亡した年より後は適用しません。生存側の生活費(支出)は死亡前と変更せず試算します。本人・パートナーの両方が死亡した年より後は、年次内訳・グラフともに行を生成せず試算を打ち切ります。<br><b>収入内訳グラフについて:</b> 給与・DC年金・公的年金は税引前(額面)の金額を表示しています。公的年金は<b>本人・パートナーを別の色(赤系統の濃淡)</b>で分けて積み上げています。「取り崩し」は、税引後の収入(給与等-税金-社会保険料)だけではその年の支出を賄えなかった不足分で、<b>投資資産の内訳グラフの取り崩し(売却手取り)と同じ薄い灰色</b>で表示しています(ただしこちらは現金からの補填も含む世帯ベースの不足額のため、投資資産の内訳グラフの数字とは一致しません)。赤字の年は、棒の合計(税引前収入+取り崩し)は「年間支出(生活費)」の線ではなく、生活費に社会保険料・税金を加えた「支出+保険料+税金(実質支出)」の線と一致します。2本の線の間隔が、その年の社会保険料+税額に相当します。
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="rateModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rateModalTitle">
+    <div class="modal-head">
+      <h2 id="rateModalTitle">税率・控除額の一覧(令和8年/2026年分・簡易モデル)</h2>
+      <button class="modal-close" id="rateModalClose" type="button" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body" id="rateModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="expenseModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="expenseModalTitle">
+    <div class="modal-head">
+      <h2 id="expenseModalTitle">年間支出を月次の科目別に計算</h2>
+      <button class="modal-close" id="expenseModalClose" type="button" aria-label="閉じる">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="table-note" style="padding:0 0 14px;">科目ごとに月額(円)を入力すると、合計×12ヶ月分を「年間支出」欄へ反映できます。この内訳自体は試算の計算には使用されません(年間支出を組み立てるための参考ツールです)。自動車税など年払いの科目は、月割りした金額を入力してください。</p>
+      <div class="field-row">
+        <div class="field"><label>家賃<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expRent" value="0"></div>
+        <div class="field"><label>光熱費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expUtility" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>通信費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expCommunication" value="0"></div>
+        <div class="field"><label>食費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expFood" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>日用品費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expDaily" value="0"></div>
+        <div class="field"><label>自動車税<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expCarTax" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>保険料<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expInsurance" value="0"></div>
+        <div class="field"><label>交友費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expSocial" value="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>固定支出(その他)<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expFixed" value="0"></div>
+        <div class="field"><label>その他<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expOther" value="0"></div>
+      </div>
+      <div class="expense-cat-total">
+        <span>月額合計</span>
+        <span id="expenseCatMonthlyTotal">0円</span>
+      </div>
+      <div class="expense-cat-total expense-cat-total-annual">
+        <span>年間支出合計(×12ヶ月)</span>
+        <span id="expenseCatAnnualTotal">0円</span>
+      </div>
+      <div class="modal-actions">
+        <button class="run-btn" id="expenseApplyBtn" type="button">この金額を「年間支出」に反映</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 金額入力欄のカンマ区切り表示 ================= */
+const AMOUNT_INPUT_IDS = [
+  'salaryPhase1','salaryPhase2','postRetIncome','lumpSum','dcTotal','kakyuNenkinAmount',
+  'primaryBasicPension','primaryKouseiPension','partnerBasicPension','partnerKouseiPension',
+  'annualExpense','retiredInsuranceAnnual','medicalExpenseAnnual','investStart','cashStart',
+  'cashTargetAmount','nisaAnnualLimit','nisaLifetimeLimit','nisaStart',
+  'spotAmount1','spotAmount2','spotAmount3',
+  'expRent','expUtility','expCommunication','expFood','expDaily','expCarTax','expInsurance','expSocial','expFixed','expOther',
+];
+const EXPENSE_CATEGORY_IDS = ['expRent','expUtility','expCommunication','expFood','expDaily','expCarTax','expInsurance','expSocial','expFixed','expOther'];
+/* 入力されたイベント名などをそのまま innerHTML に埋め込まないようエスケープする */
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function parseAmount(value){
+  const n = parseFloat(String(value).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+function formatAmountValue(value){
+  const str = String(value);
+  const negative = str.trim().startsWith('-');
+  const digits = str.replace(/[^\d]/g, '');
+  if(!digits) return negative ? '-' : '';
+  return (negative ? '-' : '') + Number(digits).toLocaleString('en-US');
+}
+/* input中はカーソル位置を「末尾から数えた桁数」基準で復元し、カンマ挿入で飛ばないようにする */
+function formatAmountInput(el){
+  const digitsAfterCursor = el.value.slice(el.selectionStart).replace(/[^\d]/g, '').length;
+  el.value = formatAmountValue(el.value);
+  let pos = el.value.length, count = 0;
+  while(pos > 0 && count < digitsAfterCursor){
+    pos--;
+    if(/\d/.test(el.value[pos])) count++;
+  }
+  el.setSelectionRange(pos, pos);
+}
+function initAmountInputs(){
+  AMOUNT_INPUT_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.value = formatAmountValue(el.value);
+    el.addEventListener('input', () => formatAmountInput(el));
+  });
+}
+
+/* ================= 税制計算(令和8年/2026年ルールの簡易モデル) ================= */
+const INCOME_TAX_BRACKETS = [
+  [1950000, 0.05, 0],
+  [3300000, 0.10, 97500],
+  [6950000, 0.20, 427500],
+  [9000000, 0.23, 636000],
+  [18000000, 0.33, 1536000],
+  [40000000, 0.40, 2796000],
+  [Infinity, 0.45, 4796000],
+];
+function incomeTax(taxable){
+  if(taxable<=0) return 0;
+  for(const [limit,rate,ded] of INCOME_TAX_BRACKETS){
+    if(taxable<=limit) return Math.max(taxable*rate-ded,0);
+  }
+  return 0;
+}
+function employmentIncomeDeduction(income){
+  if(income<=0) return 0;
+  if(income<=2200000) return 740000;
+  if(income<=3600000) return income*0.30+80000;
+  if(income<=6600000) return income*0.20+440000;
+  if(income<=8500000) return income*0.10+1100000;
+  return 1950000;
+}
+function publicPensionDeduction(age, pensionIncome){
+  if(pensionIncome<=0) return 0;
+  if(age>=65){
+    if(pensionIncome<3300000) return 1100000;
+    if(pensionIncome<4100000) return pensionIncome*0.25+275000;
+    if(pensionIncome<7700000) return pensionIncome*0.15+685000;
+    if(pensionIncome<10000000) return pensionIncome*0.05+1455000;
+    return 1955000;
+  } else {
+    if(pensionIncome<1300000) return 600000;
+    if(pensionIncome<4100000) return pensionIncome*0.25+275000;
+    if(pensionIncome<7700000) return pensionIncome*0.15+685000;
+    if(pensionIncome<10000000) return pensionIncome*0.05+1455000;
+    return 1955000;
+  }
+}
+function basicDeductionIncomeTax(totalIncome){
+  if(totalIncome<=1320000) return 1040000;
+  if(totalIncome<=4890000) return 990000;
+  if(totalIncome<=6550000) return 670000;
+  if(totalIncome<=23500000) return 620000;
+  if(totalIncome<=24750000) return 480000;
+  if(totalIncome<=25000000) return 320000;
+  return 0;
+}
+const RESIDENT_BASIC_DEDUCTION = 430000;
+const RESIDENT_PER_CAPITA = 5000;
+const RECON_RATE = 0.021;
+
+function retirementDeductionAmount(years){
+  if(years<=20) return Math.max(400000*years, 800000);
+  return 8000000 + 700000*(years-20);
+}
+function retirementTax(lumpSum, years){
+  if(lumpSum<=0) return {tax:0, taxable:0, deduction:0};
+  const deduction = retirementDeductionAmount(Math.max(years,1));
+  const base = Math.max(lumpSum-deduction, 0);
+  const taxable = Math.floor((base/2)/1000)*1000;
+  const it = incomeTax(taxable);
+  const recon = Math.floor(it*RECON_RATE);
+  const rt = Math.floor(taxable*0.10);
+  return {tax: it+recon+rt, taxable, deduction};
+}
+// 医療費控除 = 医療費 - min(10万円, 総所得金額×5%)、上限200万円
+function medicalExpenseDeduction(medicalExpense, totalIncome){
+  if(medicalExpense<=0) return 0;
+  const threshold = Math.min(100000, totalIncome*0.05);
+  return Math.min(Math.max(medicalExpense-threshold, 0), 2000000);
+}
+// 配偶者控除(配偶者特別控除は非対応。配偶者の合計所得金額が48万円を超える場合は0)
+function spousalDeduction(primaryTotalIncome, spouseIncome, spouseAge){
+  if(spouseIncome > 480000) return {incomeTax:0, residentTax:0};
+  const elderly = spouseAge >= 70;
+  if(primaryTotalIncome <= 9000000) return elderly ? {incomeTax:480000, residentTax:380000} : {incomeTax:380000, residentTax:330000};
+  if(primaryTotalIncome <= 9500000) return elderly ? {incomeTax:320000, residentTax:260000} : {incomeTax:260000, residentTax:220000};
+  if(primaryTotalIncome <= 10000000) return elderly ? {incomeTax:160000, residentTax:130000} : {incomeTax:130000, residentTax:110000};
+  return {incomeTax:0, residentTax:0};
+}
+
+/* ================= 税率モーダルの表示内容 ================= */
+const manEn = n => (n/10000).toLocaleString('ja-JP')+'万円';
+function buildIncomeTaxTableRows(){
+  let prev = 0, rows = '';
+  INCOME_TAX_BRACKETS.forEach(([limit, rate, ded]) => {
+    const range = limit === Infinity
+      ? `${manEn(prev)}超`
+      : (prev === 0 ? `${manEn(limit)}以下` : `${manEn(prev)}超 ${manEn(limit)}以下`);
+    rows += `<tr><td>${range}</td><td>${Math.round(rate*100)}%</td><td>${ded.toLocaleString('ja-JP')}円</td></tr>`;
+    prev = limit;
+  });
+  return rows;
+}
+function buildRateModalHTML(){
+  const gainsRateEl = document.getElementById('gainsTaxRate');
+  const applyGainsTaxEl = document.getElementById('applyGainsTax');
+  const gainsRate = gainsRateEl ? gainsRateEl.value : '20.315';
+  const gainsOn = applyGainsTaxEl ? applyGainsTaxEl.checked : true;
+  const nisaPriorityOn = document.getElementById('nisaPriority').checked;
+  const nisaRelayOn = nisaPriorityOn && document.getElementById('nisaRelay').checked;
+
+  const extraOn = document.getElementById('applyExtraDeductions').checked;
+  const workingRate = document.getElementById('workingInsuranceRate').value;
+  const retiredInsurance = parseAmount(document.getElementById('retiredInsuranceAnnual').value).toLocaleString('ja-JP');
+  const medicalExpense = parseAmount(document.getElementById('medicalExpenseAnnual').value).toLocaleString('ja-JP');
+  const spouseOn = document.getElementById('hasSpouseDeduction').checked;
+
+  const pensionAdjustOn = document.getElementById('applyPensionAdjust').checked;
+  const pensionStartAge = parseAmount(document.getElementById('pensionStartAge').value);
+  const pensionAdjustValue = pensionAdjustRate(pensionStartAge)*100;
+  const pensionAdjustPct = `${pensionAdjustValue >= 0 ? '+' : ''}${pensionAdjustValue.toFixed(1)}%`;
+
+  const kakyuOn = document.getElementById('applyKakyuNenkin').checked;
+  const kakyuEligible = document.getElementById('kakyuNenkinEligible').checked;
+  const kakyuAmount = parseAmount(document.getElementById('kakyuNenkinAmount').value).toLocaleString('ja-JP');
+
+  const primaryDeathOn = document.getElementById('applyPrimaryDeath').checked;
+  const primaryDeathAgeVal = document.getElementById('primaryDeathAge').value;
+  const partnerDeathOn = document.getElementById('applyPartnerDeath').checked;
+  const partnerDeathAgeVal = document.getElementById('partnerDeathAge').value;
+  const survivorOn = document.getElementById('applySurvivorPension').checked;
+  const primarySurvivorOk = document.getElementById('primarySurvivorEligible').checked;
+  const partnerSurvivorOk = document.getElementById('partnerSurvivorEligible').checked;
+  const primaryKousei = parseAmount(document.getElementById('primaryKouseiPension').value).toLocaleString('ja-JP');
+  const partnerKousei = parseAmount(document.getElementById('partnerKouseiPension').value).toLocaleString('ja-JP');
+
+  return `
+    <div class="rate-section">
+      <h3>所得税 速算表(給与・DC年金・公的年金などの総合課税分、退職金の分離課税分に共通)</h3>
+      <table class="rate-table">
+        <thead><tr><th>課税所得金額</th><th>税率</th><th>控除額</th></tr></thead>
+        <tbody>${buildIncomeTaxTableRows()}</tbody>
+      </table>
+      <p>復興特別所得税:上記で計算した所得税額の${(RECON_RATE*100).toFixed(1)}%を加算</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>給与所得控除(簡易モデル)</h3>
+      <table class="rate-table">
+        <thead><tr><th>収入金額</th><th>控除額</th></tr></thead>
+        <tbody>
+          <tr><td>220万円以下</td><td>74万円(定額)</td></tr>
+          <tr><td>220万円超 360万円以下</td><td>収入金額×30%+8万円</td></tr>
+          <tr><td>360万円超 660万円以下</td><td>収入金額×20%+44万円</td></tr>
+          <tr><td>660万円超 850万円以下</td><td>収入金額×10%+110万円</td></tr>
+          <tr><td>850万円超</td><td>195万円(上限)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rate-section">
+      <h3>公的年金等控除(簡易モデル。DC年金の受取分も同じ控除を適用)</h3>
+      <p>65歳以上</p>
+      <table class="rate-table">
+        <thead><tr><th>公的年金等の収入金額</th><th>控除額</th></tr></thead>
+        <tbody>
+          <tr><td>330万円未満</td><td>110万円(定額)</td></tr>
+          <tr><td>330万円以上 410万円未満</td><td>収入金額×25%+27.5万円</td></tr>
+          <tr><td>410万円以上 770万円未満</td><td>収入金額×15%+68.5万円</td></tr>
+          <tr><td>770万円以上 1,000万円未満</td><td>収入金額×5%+145.5万円</td></tr>
+          <tr><td>1,000万円以上</td><td>195.5万円(上限)</td></tr>
+        </tbody>
+      </table>
+      <p>65歳未満(330万円未満の行のみ異なる)</p>
+      <table class="rate-table">
+        <thead><tr><th>公的年金等の収入金額</th><th>控除額</th></tr></thead>
+        <tbody>
+          <tr><td>130万円未満</td><td>60万円(定額)</td></tr>
+          <tr><td>130万円以上(以降は65歳以上と同じ)</td><td>&nbsp;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rate-section">
+      <h3>基礎控除</h3>
+      <table class="rate-table">
+        <thead><tr><th>合計所得金額</th><th>所得税</th><th>住民税</th></tr></thead>
+        <tbody>
+          <tr><td>132万円以下</td><td>104万円</td><td rowspan="7" style="vertical-align:middle;">43万円(定額)</td></tr>
+          <tr><td>132万円超 489万円以下</td><td>99万円</td></tr>
+          <tr><td>489万円超 655万円以下</td><td>67万円</td></tr>
+          <tr><td>655万円超 2,350万円以下</td><td>62万円</td></tr>
+          <tr><td>2,350万円超 2,475万円以下</td><td>48万円</td></tr>
+          <tr><td>2,475万円超 2,500万円以下</td><td>32万円</td></tr>
+          <tr><td>2,500万円超</td><td>0円</td></tr>
+        </tbody>
+      </table>
+      <p>住民税:均等割 ${RESIDENT_PER_CAPITA.toLocaleString('ja-JP')}円/年、所得割 10%(標準税率)を別途加算</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>退職所得控除(退職一時金・分離課税)</h3>
+      <table class="rate-table">
+        <thead><tr><th>勤続年数</th><th>控除額</th></tr></thead>
+        <tbody>
+          <tr><td>20年以下</td><td>40万円×勤続年数(最低80万円)</td></tr>
+          <tr><td>20年超</td><td>800万円+70万円×(勤続年数-20年)</td></tr>
+        </tbody>
+      </table>
+      <p>課税退職所得=(退職金-上記控除)÷2 に所得税速算表・復興特別所得税を適用。住民税は課税退職所得の10%</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>社会保険料控除・医療費控除・配偶者控除(現在の入力設定)</h3>
+      <div class="rate-current">${extraOn ? `適用中: 現役時代 ${workingRate}% / 退職後 年額${retiredInsurance}円 / 医療費 年額${medicalExpense}円 / 配偶者控除 ${spouseOn?'対象あり':'対象なし'}` : '現在OFF(社会保険料・医療費控除・配偶者控除は計算に含めていません)'}</div>
+      <p>社会保険料控除:実際に支払った社会保険料の全額を所得税・住民税の両方から控除(現役時代=給与×料率、退職後=年額を物価上昇率で調整)。</p>
+      <p>医療費控除:年間医療費 - min(10万円, 総所得金額×5%)。上限200万円。所得税・住民税とも同額を控除。</p>
+      <table class="rate-table">
+        <thead><tr><th>本人の合計所得金額</th><th>配偶者控除(所得税/住民税)</th><th>老人配偶者控除・70歳以上(所得税/住民税)</th></tr></thead>
+        <tbody>
+          <tr><td>900万円以下</td><td>38万円 / 33万円</td><td>48万円 / 38万円</td></tr>
+          <tr><td>900万円超 950万円以下</td><td>26万円 / 22万円</td><td>32万円 / 26万円</td></tr>
+          <tr><td>950万円超 1,000万円以下</td><td>13万円 / 11万円</td><td>16万円 / 13万円</td></tr>
+          <tr><td>1,000万円超</td><td>0円</td><td>0円</td></tr>
+        </tbody>
+      </table>
+      <p>配偶者の合計所得金額(パートナーの年金額-公的年金等控除)が48万円を超える場合は控除0(配偶者特別控除は非対応)。左パネル「配偶者控除の対象となる配偶者がいる」で切替できます。</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>公的年金の繰上げ・繰下げ受給(現在の入力設定)</h3>
+      <div class="rate-current">${pensionAdjustOn ? `適用中: 本人の受給開始 ${pensionStartAge}歳 → 年額 ${pensionAdjustPct}` : '現在OFF(入力した年額をそのまま適用中)'}</div>
+      <table class="rate-table">
+        <thead><tr><th>受給開始年齢</th><th>年額の増減率</th></tr></thead>
+        <tbody>
+          <tr><td>60歳(繰上げ上限)</td><td>-24.0%</td></tr>
+          <tr><td>60〜64歳(繰上げ)</td><td>1ヶ月あたり -0.4%</td></tr>
+          <tr><td>65歳(基準)</td><td>±0%</td></tr>
+          <tr><td>66〜75歳(繰下げ)</td><td>1ヶ月あたり +0.7%</td></tr>
+          <tr><td>75歳(繰下げ上限)</td><td>+84.0%</td></tr>
+        </tbody>
+      </table>
+      <p>左パネルで入力した「年額(概算)」を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます。パートナーの年金にも同じ率を適用します(パートナー自身の受給開始年齢で判定。本人が何歳のときに受給が始まるかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は、制度の上下限(-24%/+84%)に丸めて適用します。</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>加給年金(現在の入力設定)</h3>
+      <div class="rate-current">${kakyuOn ? `適用中: 年額 ${kakyuAmount}円${kakyuEligible ? '(受給要件を満たす)' : '(受給要件チェックがOFFのため加算されません)'}` : '現在OFF(加給年金は加算されません)'}</div>
+      <p>本人の厚生年金加入期間が20年以上あり、本人が65歳に達して年金を受給中(繰上げ受給していても加給年金自体は65歳からで、繰下げ待機中は不支給)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額を上乗せします(パートナーが65歳になった時点で打ち切り)。金額は年度により改定されるため概算値です。子の加算・振替加算・配偶者の所得や自身の年金による支給停止・在職老齢年金による支給停止は考慮していません。</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>死亡・遺族厚生年金(現在の入力設定)</h3>
+      <div class="rate-current">
+        本人の死亡年齢: ${primaryDeathOn ? `${primaryDeathAgeVal}歳で設定` : '設定なし(試算期間中は生存)'}<br>
+        パートナーの死亡年齢: ${partnerDeathOn ? `${partnerDeathAgeVal}歳で設定` : '設定なし(試算期間中は生存)'}<br>
+        遺族厚生年金: ${survivorOn ? `適用中(本人の老齢厚生年金 ${primaryKousei}円・受給要件${primarySurvivorOk?'あり':'なし'} / パートナー ${partnerKousei}円・受給要件${partnerSurvivorOk?'あり':'なし'})` : '現在OFF(遺族厚生年金は加算されません)'}
+      </div>
+      <p>一方が死亡すると、その人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)はその年から0になります。遺族厚生年金をONにすると、生存側は自分の老齢基礎年金・老齢厚生年金を全額受け取ったうえで、「死亡した人の老齢厚生年金額の3/4」と「(死亡した人+生存側自身の老齢厚生年金額の合計)の1/2」のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を遺族厚生年金として非課税で上乗せします(死亡した人が受給要件チェックを満たす場合のみ)。中高齢寡婦加算(現行制度では妻のみ対象)、65歳以降の受給調整、遺族基礎年金(子がいる場合)は考慮していません。生存側の生活費は死亡前と変更せず試算し、本人・パートナーの両方が死亡した年より後は試算を打ち切ります。</p>
+    </div>
+
+    <div class="rate-section">
+      <h3>NISA・運用益課税(現在の入力設定)</h3>
+      <div class="rate-current">${gainsOn ? `適用中: 税率 ${gainsRate}%` : '現在OFF(運用益は非課税として試算中)'}${nisaPriorityOn ? `　/　NISA枠優先: ON${nisaRelayOn ? '(特定口座から毎年移し替え)' : ''}` : '　/　NISA枠優先: OFF(全額を特定口座へ投資)'}</div>
+      <p>既定値は20.315%(所得税15.315%+住民税5%)。左パネル「NISA・運用益課税」欄で変更できます。</p>
+    </div>
+  `;
+}
+
+// extra(任意) = {insuranceDeduction, medicalExpense, hasSpouseDeduction, spouseIncome, spouseAge}
+// 社会保険料控除・医療費控除は所得税/住民税とも同額。配偶者控除は税目ごとに金額が異なる
+function comprehensiveTax(salary, pensionTotal, age, extra){
+  const empDed = employmentIncomeDeduction(salary);
+  const salaryIncome = Math.max(salary-empDed, 0);
+  const pensionDed = publicPensionDeduction(age, pensionTotal);
+  const pensionIncome = Math.max(pensionTotal-pensionDed, 0);
+  const totalIncome = salaryIncome + pensionIncome;
+
+  let extraDed = 0, spouseIT = 0, spouseRT = 0;
+  if(extra){
+    extraDed += extra.insuranceDeduction || 0;
+    extraDed += medicalExpenseDeduction(extra.medicalExpense || 0, totalIncome);
+    if(extra.hasSpouseDeduction){
+      const sp = spousalDeduction(totalIncome, extra.spouseIncome || 0, extra.spouseAge != null ? extra.spouseAge : age);
+      spouseIT = sp.incomeTax; spouseRT = sp.residentTax;
+    }
+  }
+
+  const basicDed = basicDeductionIncomeTax(totalIncome);
+  const taxableIT = Math.max(totalIncome-basicDed-extraDed-spouseIT, 0);
+  const it = incomeTax(taxableIT);
+  const recon = Math.floor(it*RECON_RATE);
+
+  const taxableRT = Math.max(totalIncome-RESIDENT_BASIC_DEDUCTION-extraDed-spouseRT, 0);
+  const rt = taxableRT>0 ? Math.floor(taxableRT*0.10)+RESIDENT_PER_CAPITA : 0;
+
+  return {tax: it+recon+rt, totalIncome};
+}
+
+/* ================= シミュレーション ================= */
+/* 公的年金の繰上げ・繰下げ受給による年額の増減率。65歳を基準に、
+   繰上げ(60〜64歳)は1ヶ月あたり -0.4%(最大 -24%)、繰下げ(66〜75歳)は1ヶ月あたり +0.7%(最大 +84%)。
+   入力が 60〜75歳の範囲外の場合は、制度の上下限に丸めて適用する */
+const PENSION_BASE_AGE = 65, PENSION_MIN_START_AGE = 60, PENSION_MAX_START_AGE = 75;
+function pensionAdjustRate(startAge){
+  if(!Number.isFinite(startAge)) return 0;
+  const clamped = Math.min(Math.max(startAge, PENSION_MIN_START_AGE), PENSION_MAX_START_AGE);
+  const months = Math.round((clamped - PENSION_BASE_AGE) * 12);
+  return months < 0 ? months * 0.004 : months * 0.007;
+}
+
+function readParams(){
+  const v = id => parseAmount(document.getElementById(id).value);
+  const spotExpenses = [1,2,3].map(i => {
+    const row = document.querySelector(`.spot-row[data-spot="${i}"]`);
+    return {
+      name: document.getElementById('spotName'+i).value.trim(),
+      age: Math.round(v('spotAge'+i)),
+      amount: Math.max(v('spotAmount'+i), 0),
+      inflate: document.getElementById('spotInflate'+i).checked,
+      enabled: !(row && row.hidden),
+    };
+  }).filter(s => s.enabled && s.amount > 0 && s.age > 0);
+  return {
+    spotExpenses,
+    expenseRatioUnder75: Math.max(v('expenseRatioUnder75'), 0),
+    expenseRatio75to84: Math.max(v('expenseRatio75to84'), 0),
+    expenseRatio85plus: Math.max(v('expenseRatio85plus'), 0),
+    returnRateUnder65: v('returnRateUnder65'),
+    returnRate66to75: v('returnRate66to75'),
+    returnRate76plus: v('returnRate76plus'),
+    useGlidePath: document.getElementById('useGlidePath').checked,
+    applyPensionAdjust: document.getElementById('applyPensionAdjust').checked,
+    currentAge: v('currentAge'),
+    simEndAge: v('simEndAge'),
+    retirementAge: v('retirementAge'),
+    salaryPhase1: v('salaryPhase1'),
+    salaryPhase2StartAge: v('salaryPhase2StartAge'),
+    salaryPhase2: v('salaryPhase2'),
+    postRetIncome: Math.max(v('postRetIncome'), 0),
+    postRetIncomeStartAge: v('postRetIncomeStartAge'),
+    postRetIncomeYears: Math.max(v('postRetIncomeYears'), 0),
+    lumpSum: v('lumpSum'),
+    lumpSumAge: v('lumpSumAge'),
+    serviceYears: v('serviceYears'),
+    lumpSumCashRatio: Math.min(Math.max(v('lumpSumCashRatio'),0),100),
+    dcTotal: v('dcTotal'),
+    dcStartAge: v('dcStartAge'),
+    dcYears: Math.max(v('dcYears'),1),
+    primaryBasicPension: Math.max(v('primaryBasicPension'), 0),
+    primaryKouseiPension: Math.max(v('primaryKouseiPension'), 0),
+    pensionStartAge: v('pensionStartAge'),
+    primarySurvivorEligible: document.getElementById('primarySurvivorEligible').checked,
+    partnerBasicPension: Math.max(v('partnerBasicPension'), 0),
+    partnerKouseiPension: Math.max(v('partnerKouseiPension'), 0),
+    partnerAgeDiff: Math.round(v('partnerAgeDiff')),
+    partnerPensionStartAge: v('partnerPensionStartAge'),
+    partnerSurvivorEligible: document.getElementById('partnerSurvivorEligible').checked,
+    applyKakyuNenkin: document.getElementById('applyKakyuNenkin').checked,
+    kakyuNenkinEligible: document.getElementById('kakyuNenkinEligible').checked,
+    kakyuNenkinAmount: Math.max(v('kakyuNenkinAmount'), 0),
+    applyPrimaryDeath: document.getElementById('applyPrimaryDeath').checked,
+    primaryDeathAge: v('primaryDeathAge'),
+    applyPartnerDeath: document.getElementById('applyPartnerDeath').checked,
+    partnerDeathAge: v('partnerDeathAge'),
+    applySurvivorPension: document.getElementById('applySurvivorPension').checked,
+    annualExpense: v('annualExpense'),
+    inflationRate: v('inflationRate'),
+    workingInsuranceRate: Math.min(Math.max(v('workingInsuranceRate'),0),100),
+    retiredInsuranceAnnual: Math.max(v('retiredInsuranceAnnual'),0),
+    medicalExpenseAnnual: Math.max(v('medicalExpenseAnnual'),0),
+    investReturnRate: v('investReturnRate'),
+    cashTargetAmount: v('cashTargetAmount'),
+    investStart: v('investStart'),
+    cashStart: v('cashStart'),
+    nisaAnnualLimit: Math.max(v('nisaAnnualLimit'),0),
+    nisaLifetimeLimit: Math.max(v('nisaLifetimeLimit'),0),
+    nisaStart: Math.min(Math.max(v('nisaStart'),0), Math.max(v('investStart'),0)),
+    gainsTaxRate: Math.min(Math.max(v('gainsTaxRate'),0),100),
+    applyTax: document.getElementById('applyTax').checked,
+    applyExtraDeductions: document.getElementById('applyExtraDeductions').checked,
+    hasSpouseDeduction: document.getElementById('hasSpouseDeduction').checked,
+    applyGainsTax: document.getElementById('applyGainsTax').checked,
+    nisaPriority: document.getElementById('nisaPriority').checked,
+    nisaPacedInvesting: document.getElementById('nisaPacedInvesting').checked,
+    // 「NISA枠を優先して埋める」がOFFのときは、移し替え・ペース調整とも意味がないので無効化する
+    nisaRelay: document.getElementById('nisaPriority').checked && document.getElementById('nisaRelay').checked,
+    maintainCashTarget: document.getElementById('maintainCashTarget').checked,
+    principalMethod: document.getElementById('principalMethod').value,
+    currentYear: 2026,
+  };
+}
+
+function runSimulation(p){
+  const rows = [];
+  let cash = p.cashStart;
+
+  // 運用資産はNISA口座と特定口座に分けて保持する。bal=残高, principal=元本(簿価)
+  const nisa = {bal: p.nisaStart, principal: p.nisaStart, taxed: false};
+  const taxable = {bal: p.investStart - p.nisaStart, principal: p.investStart - p.nisaStart, taxed: true};
+  const investBal = () => nisa.bal + taxable.bal;
+  const investPrincipal = () => nisa.principal + taxable.principal;
+
+  let nisaLifetimeUsed = p.nisaStart; // 生涯投資枠の使用済み額(簿価ベース)
+  let nisaAnnualLeft = p.nisaAnnualLimit;
+  let nisaFreedNextYear = 0; // 売却した簿価分。制度どおり翌年に枠が復活する
+  let gainsTaxThisYear = 0;
+  let investSoldNetThisYear = 0; // その年に運用資産を売却して得た手取り(売却総額 - 運用益課税)
+
+  let cumulativeTax = 0;
+  let cumulativeGainsTax = 0;
+  let cumulativeIncome = 0; // 生涯収入(税引前。給与・少額収入・退職金・DC年金・公的年金・パートナー年金・遺族厚生年金の合計)
+  let cumulativeExpense = 0; // 生涯支出総額(生活費+保険料、各年の物価上昇後の名目額を合計)
+  let cumulativeRealizedGain = 0; // 取り崩し時に確定した運用損益の累計(税引前)
+  let peak = cash + investBal();
+  let depletionAge = null;
+  let drawdownAge = null;
+  let nisaFullAge = null; // 生涯投資枠を使い切った年齢
+
+  // 公的年金は、受給開始年齢に応じた繰上げ・繰下げの増減を年額へ反映する(入力値は65歳開始時の年額とみなす)。
+  // パートナーの受給開始年齢はパートナー自身の年齢で指定されるため、増減率もその年齢で判定する
+  const pensionRate = p.applyPensionAdjust ? pensionAdjustRate(p.pensionStartAge) : 0;
+  const partnerPensionRate = p.applyPensionAdjust ? pensionAdjustRate(p.partnerPensionStartAge) : 0;
+  const primaryBasicAnnual = p.primaryBasicPension * (1 + pensionRate);
+  const primaryKouseiAnnual = p.primaryKouseiPension * (1 + pensionRate);
+  const partnerBasicAnnual = p.partnerBasicPension * (1 + partnerPensionRate);
+  const partnerKouseiAnnual = p.partnerKouseiPension * (1 + partnerPensionRate);
+
+  // 運用へ回す資金は、NISA枠(年間・生涯)の空きに優先して入れる。
+  // 入りきらない分は、既定では特定口座へ。ただし p.nisaPacedInvesting が有効な場合、
+  // 生涯枠がまだ残っているなら特定口座へは回さず、投資できなかった金額を呼び出し側へ返す
+  // (呼び出し側で現金に戻し、翌年以降のNISA年間枠が空き次第あらためて投資を試みる)
+  // その年に残っているNISA枠(年間枠と生涯枠のうち小さい方)
+  const nisaRoom = () => p.nisaPriority
+    ? Math.max(Math.min(nisaAnnualLeft, p.nisaLifetimeLimit - nisaLifetimeUsed), 0)
+    : 0;
+
+  const investIn = amount => {
+    if(amount <= 0) return 0;
+    let rest = amount;
+    const lifetimeRoom = p.nisaLifetimeLimit - nisaLifetimeUsed;
+    const room = nisaRoom(); // 「NISA枠を優先して埋める」がOFFなら常に0(全額を特定口座へ)
+    const toNisa = Math.min(rest, room);
+    if(toNisa > 0){
+      nisa.bal += toNisa;
+      nisa.principal += toNisa;
+      nisaAnnualLeft -= toNisa;
+      nisaLifetimeUsed += toNisa;
+      rest -= toNisa;
+    }
+    if(rest > 0){
+      const lifetimeRoomAfter = lifetimeRoom - toNisa; // 今回の投資後になお残る生涯枠
+      if(p.nisaPriority && p.nisaPacedInvesting && lifetimeRoomAfter > 1e-6) return rest;
+      taxable.bal += rest;
+      taxable.principal += rest;
+    }
+    return 0;
+  };
+
+  // 必要な「手取り」を得るために売却する。特定口座から先に売り、売却益には課税する
+  //   (源泉徴収と同じく、税引後が必要額になるよう売却額を割り戻す)
+  // 元本の減らし方は設定に従う
+  //   prorata    : 元本と運用益の構成比で按分(投資信託の平均取得単価方式と同じ考え方)
+  //   gainsFirst : 運用益を先に使い切り、足りない分だけ元本を取り崩す
+  // opts.accounts   : 売却対象の口座(既定は特定口座→NISAの順)
+  // opts.asDrawdown : false なら「取り崩し」として集計しない。NISAへの移し替えのように、
+  //                   売却しても手取りが運用資産の外へ出ていかないケースで使う
+  const investOut = (neededNet, opts = {}) => {
+    const accounts = opts.accounts || [taxable, nisa];
+    const asDrawdown = opts.asDrawdown !== false;
+    let remaining = neededNet;
+    let net = 0;
+    for(const b of accounts){
+      if(remaining <= 1e-6) break;
+      if(b.bal <= 1e-6) continue;
+      const rate = (b.taxed && p.applyGainsTax) ? p.gainsTaxRate/100 : 0;
+      const gains = Math.max(b.bal - b.principal, 0);
+
+      // 税引後が remaining になる売却額を求める
+      let draw;
+      if(rate <= 0 || gains <= 0){
+        draw = remaining;
+      } else if(p.principalMethod === 'gainsFirst'){
+        const allFromGains = remaining/(1-rate);
+        draw = allFromGains <= gains ? allFromGains : remaining + gains*rate;
+      } else {
+        draw = remaining/(1 - (gains/b.bal)*rate);
+      }
+      draw = Math.min(draw, b.bal);
+
+      const principalCut = p.principalMethod === 'gainsFirst'
+        ? Math.max(draw - gains, 0)
+        : draw * (b.bal > 0 ? b.principal/b.bal : 0);
+      const realized = draw - principalCut; // 元本割れ中はマイナス(損失の繰越は考慮しない)
+      const tax = Math.max(realized, 0) * rate;
+      cumulativeRealizedGain += realized;
+
+      b.bal -= draw;
+      // 全額売却した場合は元本も消える。元本割れ中は元本 > 残高のままにする(その差が含み損)
+      b.principal = b.bal <= 1e-6 ? 0 : Math.max(b.principal - principalCut, 0);
+      if(!b.taxed) nisaFreedNextYear += principalCut; // NISAは売却した簿価分の枠が翌年復活する
+
+      gainsTaxThisYear += tax;
+      const proceeds = draw - tax;
+      if(asDrawdown) investSoldNetThisYear += proceeds;
+      net += proceeds;
+      remaining -= proceeds;
+    }
+    return net;
+  };
+
+  for(let age=p.currentAge; age<=p.simEndAge; age++){
+    // 年初: NISAの年間投資枠をリセットし、前年に売却した簿価分の生涯枠を復活させる
+    nisaAnnualLeft = p.nisaAnnualLimit;
+    nisaLifetimeUsed = Math.max(nisaLifetimeUsed - nisaFreedNextYear, 0);
+    nisaFreedNextYear = 0;
+    gainsTaxThisYear = 0;
+    investSoldNetThisYear = 0;
+    // パートナーの年齢は本人の年齢+年齢差。年金の開始判定・公的年金等控除・配偶者控除の年齢判定に使う
+    const partnerAge = age + p.partnerAgeDiff;
+    // 死亡年齢に達した年から、その人の収入はすべて0として扱う(死亡年齢そのものの年も含む)
+    const primaryAlive = !(p.applyPrimaryDeath && age >= p.primaryDeathAge);
+    const partnerAlive = !(p.applyPartnerDeath && partnerAge >= p.partnerDeathAge);
+    if(!primaryAlive && !partnerAlive) break; // 両方死亡した年以降は試算を打ち切る
+
+    const isWorking = primaryAlive && age < p.retirementAge;
+    let salary = 0;
+    if(isWorking){
+      salary = age < p.salaryPhase2StartAge ? p.salaryPhase1 : p.salaryPhase2;
+    }
+    // 退職後の少額収入(給与所得として他の給与と合算して課税する)
+    const postRetIncome = primaryAlive && (age >= p.postRetIncomeStartAge && age < p.postRetIncomeStartAge + p.postRetIncomeYears) ? p.postRetIncome : 0;
+    const lump = primaryAlive && (age === p.lumpSumAge) ? p.lumpSum : 0;
+    const dc = primaryAlive && (age >= p.dcStartAge && age < p.dcStartAge + p.dcYears) ? (p.dcTotal / p.dcYears) : 0;
+    // 老齢基礎年金・老齢厚生年金は、生死にかかわらず「受給開始年齢に達していれば本来受け取れる額」を別途保持する
+    // (rawの厚生年金額は、本人が死亡した年でも遺族厚生年金の算定に使うため)
+    const primaryBasicRaw = (age >= p.pensionStartAge) ? primaryBasicAnnual : 0;
+    const primaryKouseiRaw = (age >= p.pensionStartAge) ? primaryKouseiAnnual : 0;
+    const basePension = primaryAlive ? (primaryBasicRaw + primaryKouseiRaw) : 0;
+    // 加給年金: 厚生年金の加入期間20年以上の受給要件を満たす本人が65歳に達し、かつ年金を受給中で、
+    // パートナーが生存中かつ65歳未満(=まだ加給年金の対象)の間、本人の公的年金に上乗せする。
+    // 繰上げ受給をしても加給年金の支給開始は65歳からで早まらない(繰上げの対象外)。
+    // 繰下げ受給の場合は待機中(年金自体が未受給)は加給年金も不支給となるため、
+    // basePension>0(=実際に年金受給が始まっている)の条件だけで自動的に表現される。
+    const kakyuNenkin = (p.applyKakyuNenkin && p.kakyuNenkinEligible && basePension > 0 && age >= 65 && partnerAlive && partnerAge < 65) ? p.kakyuNenkinAmount : 0;
+    const pension = basePension + kakyuNenkin;
+    const partnerBasicRaw = (partnerAge >= p.partnerPensionStartAge) ? partnerBasicAnnual : 0;
+    const partnerKouseiRaw = (partnerAge >= p.partnerPensionStartAge) ? partnerKouseiAnnual : 0;
+    const partnerPension = partnerAlive ? (partnerBasicRaw + partnerKouseiRaw) : 0;
+    // 遺族厚生年金: 一方が死亡し、他方が生存している場合、生存側は自分の老齢基礎年金・老齢厚生年金を
+    // 全額受け取ったうえで、「死亡した人の老齢厚生年金額の3/4」と「死亡した人+生存側自身の老齢厚生年金額の
+    // 合計の1/2」のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を上乗せする(併給調整)。
+    // 死亡した人が受給要件(原則25年以上の厚生年金加入)を満たさない場合は発生しない
+    let survivorPension = 0;
+    if(p.applySurvivorPension){
+      if(!primaryAlive && partnerAlive && p.primarySurvivorEligible){
+        const formula = Math.max(primaryKouseiRaw * 0.75, (primaryKouseiRaw + partnerKouseiRaw) * 0.5);
+        survivorPension = Math.max(formula - partnerKouseiRaw, 0);
+      } else if(primaryAlive && !partnerAlive && p.partnerSurvivorEligible){
+        const formula = Math.max(partnerKouseiRaw * 0.75, (partnerKouseiRaw + primaryKouseiRaw) * 0.5);
+        survivorPension = Math.max(formula - primaryKouseiRaw, 0);
+      }
+    }
+    const pensionTotal = dc + pension; // 本人の公的年金等控除の対象(DC+本人の公的年金)。パートナー分・遺族厚生年金は含めない
+
+    const yearsElapsed = age - p.currentAge;
+    const inflationFactor = Math.pow(1 + p.inflationRate/100, yearsElapsed);
+
+    // ライフステージ別の支出倍率。物価上昇率を適用した後の年間支出に、その年の年齢に応じた倍率を掛ける
+    const expenseRatio = (age < 75 ? p.expenseRatioUnder75 : age < 85 ? p.expenseRatio75to84 : p.expenseRatio85plus) / 100;
+    const baseExpense = p.annualExpense * inflationFactor * expenseRatio;
+    // スポット(一時的)支出。該当年齢の年に一度だけ加算する(物価上昇率の適用は行ごとの設定に従う)
+    const spots = p.spotExpenses.filter(s => s.age === age);
+    const spotExpense = spots.reduce((sum, s) => sum + (s.inflate ? s.amount * inflationFactor : s.amount), 0);
+    const spotLabel = spots.map(s => s.name).filter(Boolean).join(' / ');
+    const expense = baseExpense + spotExpense;
+
+    // 社会保険料(健康保険・介護保険料等)。現役時代は給与に対する概算料率、退職後は年額(物価上昇率で調整)。
+    // 税額控除としてだけでなく、実際の支出としても収支に反映する
+    const insurancePremium = p.applyExtraDeductions
+      ? (isWorking ? salary * (p.workingInsuranceRate/100) : p.retiredInsuranceAnnual * inflationFactor)
+      : 0;
+    const medicalExpenseThisYear = p.applyExtraDeductions
+      ? p.medicalExpenseAnnual * inflationFactor
+      : 0;
+    // 配偶者控除の判定に使う、パートナーの合計所得金額(パートナー自身の公的年金等控除後)
+    const partnerPensionIncome = Math.max(0, partnerPension - publicPensionDeduction(partnerAge, partnerPension));
+
+    let otherTax = 0, lumpTax = 0, partnerTax = 0, lumpDeduction = 0, lumpTaxable = 0;
+    if(p.applyTax){
+      const extra = p.applyExtraDeductions ? {
+        insuranceDeduction: insurancePremium,
+        medicalExpense: medicalExpenseThisYear,
+        hasSpouseDeduction: p.hasSpouseDeduction && partnerAlive,
+        spouseIncome: partnerPensionIncome,
+        spouseAge: partnerAge, // 老人配偶者控除(70歳以上)の判定はパートナーの実年齢で行う
+      } : null;
+      const comp = comprehensiveTax(salary + postRetIncome, pensionTotal, age, extra);
+      otherTax = comp.tax;
+      // パートナーの年金は本人とは別の確定申告(別世帯主体)として独立に課税する
+      // (社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用)
+      if(partnerPension > 0){
+        partnerTax = comprehensiveTax(0, partnerPension, partnerAge).tax;
+      }
+      if(lump>0){
+        const rtax = retirementTax(lump, p.serviceYears);
+        lumpTax = rtax.tax;
+        lumpDeduction = rtax.deduction;
+        lumpTaxable = rtax.taxable;
+      }
+    }
+    // 通常の収支(給与・退職後少額収入・DC・年金・パートナー年金・遺族厚生年金(非課税) - 税金 - 社会保険料 - 支出)。退職一時金は含めない。
+    const otherNetIncome = salary + postRetIncome + dc + pension + partnerPension + survivorPension - otherTax - partnerTax - insurancePremium;
+    const netCashFlow = otherNetIncome - expense;
+
+    if(drawdownAge===null && netCashFlow<0 && age>=p.retirementAge) drawdownAge = age;
+
+    cash += netCashFlow;
+    const targetCash = p.cashTargetAmount;
+    if(cash > targetCash){
+      const notInvested = investIn(cash-targetCash);
+      cash = targetCash + notInvested; // 投資しきれなかった分(NISAペース調整時)は現金に残す
+    } else if(cash < 0){
+      cash += investOut(-cash);
+    }
+
+    // オプション: 現金保有目標を下回った場合、運用資産を取り崩して目標まで補充する
+    if(p.maintainCashTarget && cash < targetCash && investBal() > 0){
+      cash += investOut(targetCash - cash);
+    }
+
+    // 退職一時金(税引後)は、通常の現金バッファ調整とは別に、指定した比率で現金/運用へ直接配分する
+    if(lump > 0){
+      const lumpNet = lump - lumpTax;
+      const lumpCash = lumpNet * (p.lumpSumCashRatio/100);
+      const notInvested = investIn(lumpNet - lumpCash);
+      cash += lumpCash + notInvested; // 投資しきれなかった分は現金として保有し、翌年以降に再度投資を試みる
+      // 退職一時金で配分した現金分も例外なく現金保有目標でキャップし、超過分は自動で運用へ回す
+      if(cash > targetCash){
+        const notInvestedLump = investIn(cash-targetCash);
+        cash = targetCash + notInvestedLump;
+      }
+    }
+
+    // 特定口座からNISAへの移し替え(リレー投資)。その年に残っているNISA枠の空き分だけ特定口座を
+    // 売却し、税引後の手取りをそのままNISAで買い直す。現金は増減しないが、売却益への課税分だけ
+    // 運用資産は目減りする(その代わり以降の運用益が非課税になる)
+    if(p.nisaRelay && taxable.bal > 1e-6){
+      const room = nisaRoom();
+      if(room > 1e-6){
+        const moved = investOut(room, {accounts: [taxable], asDrawdown: false});
+        cash += investIn(moved); // 端数で投資しきれなかった分だけ現金へ戻す(通常は0)
+      }
+    }
+
+    // 運用益は元本を増やさない。利回りはグライドパス設定がONなら年齢帯別、OFFなら一律の運用利回りを使う
+    const returnRate = p.useGlidePath
+      ? (age <= 65 ? p.returnRateUnder65 : age <= 75 ? p.returnRate66to75 : p.returnRate76plus)
+      : p.investReturnRate;
+    const growth = 1 + returnRate/100;
+    nisa.bal *= growth;
+    taxable.bal *= growth;
+
+    if(nisaFullAge===null && p.nisaLifetimeLimit > 0 && nisaLifetimeUsed >= p.nisaLifetimeLimit - 1e-6) nisaFullAge = age;
+
+    // 運用益課税は売却時に源泉徴収される想定なので、その年の税金計に内数として含める
+    const totalTax = otherTax + partnerTax + lumpTax + gainsTaxThisYear;
+    cumulativeTax += totalTax;
+    cumulativeGainsTax += gainsTaxThisYear;
+    cumulativeIncome += salary + postRetIncome + lump + dc + pension + partnerPension + survivorPension;
+    cumulativeExpense += expense + insurancePremium;
+
+    const invest = investBal();
+    const principal = investPrincipal();
+    const total = cash + invest;
+    if(total > peak) peak = total;
+    if(depletionAge===null && total < 0) depletionAge = age;
+
+    // 取り崩し額 = その年の収入(税引後)だけでは支出を賄えなかった不足分。現金・運用資産から補われる
+    const drawdown = Math.max(0, -netCashFlow);
+
+    rows.push({age, year:p.currentYear+yearsElapsed, salary, postRetIncome, lump, dc, pension, kakyuNenkin, partnerPension, survivorPension, primaryAlive, partnerAlive, partnerAge, expense,
+      baseExpense, spotExpense, spotLabel, expenseRatio, returnRate,
+      insurancePremium, totalTax, otherTax, partnerTax, lumpTax, lumpDeduction, lumpTaxable,
+      gainsTax: gainsTaxThisYear, gainsTaxRatePct: p.applyGainsTax ? p.gainsTaxRate : 0,
+      investSoldNet: investSoldNetThisYear,
+      netCashFlow, drawdown, cash, invest, principal,
+      gain: invest-principal, nisaBal: nisa.bal, nisaPrincipal: nisa.principal,
+      taxableBal: taxable.bal, taxablePrincipal: taxable.principal, nisaUsed: nisaLifetimeUsed, total});
+  }
+  // 運用益の累計 = 取り崩し時に確定した損益の累計 + 現在保有分の含み損益
+  const lastGain = rows.length ? rows[rows.length-1].gain : 0;
+  const cumulativeGain = cumulativeRealizedGain + lastGain;
+
+  return {rows, cumulativeTax, cumulativeGainsTax, cumulativeIncome, cumulativeExpense, cumulativeGain, peak, depletionAge, drawdownAge, nisaFullAge};
+}
+
+/* ================= 描画(外部ライブラリ不使用・SVG手描き) ================= */
+const yen = n => Math.round(n).toLocaleString('ja-JP');
+const manyen = n => Math.round(n/10000).toLocaleString('ja-JP');
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// SVGの座標系は、描画領域の実ピクセルサイズにそのまま合わせる(1単位=1px)。
+// 固定のviewBoxを preserveAspectRatio="none" で引き伸ばすと、画面幅によって文字が
+// 横に潰れたり伸びたりしてしまうため(スマホでは3倍以上潰れていた)
+function chartBox(wrap){
+  const VB_W = Math.round(Math.max(wrap.clientWidth || 1000, 260));
+  const VB_H = Math.round(Math.max(wrap.clientHeight || 380, 200));
+  const narrow = VB_W < 520;
+  return {
+    VB_W, VB_H, narrow,
+    MARGIN: {left: narrow ? 48 : 64, right: narrow ? 10 : 16, top: 16, bottom: 34},
+    fs: narrow ? 9.5 : 10.5, // 目盛りラベルの文字サイズ
+  };
+}
+
+/* マウスとタッチの両方でグラフを読み取れるようにする。
+   タッチでは、横方向のスワイプならグラフの読み取り(縦スクロールを止める)、
+   縦方向のスワイプならページのスクロールを優先する */
+function addChartPointerTracking(target, onMove, onLeave){
+  target.addEventListener('mousemove', e => onMove(e.clientX, e.clientY, false));
+  target.addEventListener('mouseleave', onLeave);
+
+  let startX = 0, startY = 0, axis = null;
+  target.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; axis = null;
+    onMove(t.clientX, t.clientY, true);
+  }, {passive:true});
+  target.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if(axis === null){
+      const dx = Math.abs(t.clientX - startX), dy = Math.abs(t.clientY - startY);
+      if(dx < 6 && dy < 6) return; // 方向が定まるまで判定を保留
+      axis = dx > dy ? 'x' : 'y';
+    }
+    if(axis === 'y') return; // 縦スワイプはページのスクロールに任せる
+    e.preventDefault();
+    onMove(t.clientX, t.clientY, true);
+  }, {passive:false});
+  target.addEventListener('touchend', onLeave);
+  target.addEventListener('touchcancel', onLeave);
+}
+
+/* ツールチップをポインタの近くに置く。タッチのときは指で隠れないよう上側に出す */
+function placeTooltip(tooltipEl, wrap, clientX, clientY, isTouch){
+  const wrapRect = wrap.getBoundingClientRect();
+  const px = clientX - wrapRect.left;
+  const py = clientY - wrapRect.top;
+  const ttW = tooltipEl.offsetWidth || 170;
+  const ttH = tooltipEl.offsetHeight || 90;
+  let left = px + 16;
+  let top = isTouch ? py - ttH - 24 : py + 16;
+  if(left + ttW > wrapRect.width) left = Math.max(px - ttW - 16, 0);
+  if(left < 0) left = 0;
+  if(top + ttH > wrapRect.height) top = Math.max(py - ttH - 16, 0);
+  if(top < 0) top = isTouch ? Math.min(py + 24, wrapRect.height - ttH) : 0;
+  tooltipEl.style.transform = `translate(${left}px, ${Math.max(top,0)}px)`;
+}
+
+function niceStep(range, targetTicks){
+  const raw = range / targetTicks;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  let step;
+  if(norm < 1.5) step = 1;
+  else if(norm < 3) step = 2;
+  else if(norm < 7) step = 5;
+  else step = 10;
+  return step * mag;
+}
+
+function renderChart(result){
+  const wrap = document.getElementById('chartWrap');
+  const tooltip = document.getElementById('chartTooltip');
+  const {VB_W, VB_H, MARGIN, fs, narrow} = chartBox(wrap);
+  const rows = result.rows;
+  const ages = rows.map(r=>r.age);
+  const minAge = ages[0], maxAge = ages[ages.length-1];
+
+  const cashTop = rows.map(r=>r.cash);
+  const stackTop = rows.map(r=>r.cash + r.invest); // = total
+  const principalTop = rows.map(r=>r.cash + r.principal); // 元本割れ時は stackTop を上回り得る
+  let minVal = Math.min(0, ...cashTop, ...stackTop, ...principalTop);
+  let maxVal = Math.max(0, ...stackTop, ...cashTop, ...principalTop);
+  if(maxVal === minVal) maxVal = minVal + 1;
+  const pad = (maxVal - minVal) * 0.08;
+  maxVal += pad;
+  if(minVal < 0) minVal -= pad;
+
+  const plotW = VB_W - MARGIN.left - MARGIN.right;
+  const plotH = VB_H - MARGIN.top - MARGIN.bottom;
+  const xScale = age => MARGIN.left + (age - minAge) / (maxAge - minAge || 1) * plotW;
+  const yScale = val => MARGIN.top + plotH - (val - minVal) / (maxVal - minVal || 1) * plotH;
+
+  const zeroY = yScale(0);
+
+  // --- paths ---
+  const cashLinePts = rows.map(r => `${xScale(r.age)},${yScale(r.cash)}`);
+  const stackLinePts = rows.map(r => `${xScale(r.age)},${yScale(r.cash + r.invest)}`);
+  const cashLineRev = rows.slice().reverse().map(r => `${xScale(r.age)},${zeroY}`);
+  const cashAreaPath = `M${cashLinePts.join(' L')} L${cashLineRev.join(' L')} Z`;
+
+  const cashLineRevForInvest = rows.slice().reverse().map(r => `${xScale(r.age)},${yScale(r.cash)}`);
+  const investAreaPath = `M${stackLinePts.join(' L')} L${cashLineRevForInvest.join(' L')} Z`;
+
+  // 運用元本は現金の上に積んだ位置に描く。合計ラインとの差が運用損益になる
+  const principalLinePts = rows.map(r => `${xScale(r.age)},${yScale(r.cash + r.principal)}`);
+
+  const totalLinePath = `M${stackLinePts.join(' L')}`;
+
+  // --- axis ticks ---
+  const yStep = niceStep(maxVal - minVal, 5);
+  const yTicks = [];
+  for(let v = Math.ceil(minVal / yStep) * yStep; v <= maxVal; v += yStep) yTicks.push(Math.round(v));
+
+  // 5の倍数の年齢を軸目盛りにし、両端(現在の年齢・試算終了年齢)は5の倍数でなくても表示する
+  const xTicks = [];
+  for(let a = Math.ceil(minAge/5)*5; a <= maxAge; a += 5) xTicks.push(a);
+  if(xTicks[0] !== minAge) xTicks.unshift(minAge);
+  if(xTicks[xTicks.length-1] !== maxAge) xTicks.push(maxAge);
+
+  const marker = (age, color, label, dy) => {
+    if(age == null || age < minAge || age > maxAge) return '';
+    const x = xScale(age);
+    return `
+      <line x1="${x}" y1="${MARGIN.top}" x2="${x}" y2="${VB_H-MARGIN.bottom}" stroke="${color}" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <text x="${x+5}" y="${MARGIN.top+dy}" font-size="${narrow?9.5:11}" font-weight="600" fill="${color}">${label}</text>
+    `;
+  };
+
+  const svg = `
+  <svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="gradCash" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--accent-cash)" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="var(--accent-cash)" stop-opacity="0.05"/>
+      </linearGradient>
+      <linearGradient id="gradInvest" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="var(--accent-invest)" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="var(--accent-invest)" stop-opacity="0.08"/>
+      </linearGradient>
+    </defs>
+
+    ${yTicks.map(v => `
+      <line x1="${MARGIN.left}" y1="${yScale(v)}" x2="${VB_W-MARGIN.right}" y2="${yScale(v)}" stroke="var(--border-soft)" stroke-width="1"/>
+      <text x="${MARGIN.left-8}" y="${yScale(v)+3}" text-anchor="end" font-size="${fs}">${manyen(v)}万</text>
+    `).join('')}
+
+    ${minVal < 0 ? `<line x1="${MARGIN.left}" y1="${zeroY}" x2="${VB_W-MARGIN.right}" y2="${zeroY}" stroke="var(--chart-zeroline)" stroke-width="1.2" stroke-dasharray="2,3"/>` : ''}
+
+    ${xTicks.map(a => `<text x="${xScale(a)}" y="${VB_H-MARGIN.bottom+18}" text-anchor="middle" font-size="${fs}">${a}</text>`).join('')}
+    <text x="${(MARGIN.left+VB_W-MARGIN.right)/2}" y="${VB_H-4}" text-anchor="middle" font-size="${fs}" fill="var(--text-2)">年齢</text>
+
+    <path d="${cashAreaPath}" fill="url(#gradCash)"/>
+    <path d="${investAreaPath}" fill="url(#gradInvest)"/>
+    <polyline points="${cashLinePts.join(' ')}" fill="none" stroke="var(--accent-cash)" stroke-width="1.5"/>
+    <polyline points="${principalLinePts.join(' ')}" fill="none" stroke="var(--accent-principal)" stroke-width="1.8" stroke-dasharray="6,5" stroke-linecap="round"/>
+    <path d="${totalLinePath}" fill="none" stroke="var(--chart-total-line)" stroke-width="2.5"/>
+
+    ${marker(result.drawdownAge, 'var(--accent-cash)', narrow ? `取崩 ${result.drawdownAge}歳` : `取り崩し開始 ${result.drawdownAge}歳`, 14)}
+    ${marker(result.depletionAge, 'var(--accent-warn)', narrow ? `枯渇 ${result.depletionAge}歳` : `資産枯渇 ${result.depletionAge}歳`, 28)}
+
+    <rect id="hoverCatcher" x="${MARGIN.left}" y="${MARGIN.top}" width="${plotW}" height="${plotH}" fill="transparent"/>
+    <line id="hoverLine" x1="0" y1="${MARGIN.top}" x2="0" y2="${VB_H-MARGIN.bottom}" stroke="var(--chart-hoverline)" stroke-width="1" opacity="0"/>
+    <circle id="hoverDotCash" r="3.5" fill="var(--accent-cash)" opacity="0"/>
+    <circle id="hoverDotPrincipal" r="3" fill="var(--accent-principal)" opacity="0"/>
+    <circle id="hoverDotTotal" r="3.5" fill="var(--chart-total-line)" opacity="0"/>
+  </svg>`;
+
+  wrap.innerHTML = svg + wrap.querySelector('.chart-tooltip').outerHTML;
+  // re-append tooltip node reference (innerHTML above replaced it, so grab fresh one)
+  const tooltipEl = wrap.querySelector('.chart-tooltip');
+
+  const svgEl = wrap.querySelector('svg');
+  const hoverCatcher = svgEl.querySelector('#hoverCatcher');
+  const hoverLine = svgEl.querySelector('#hoverLine');
+  const dotCash = svgEl.querySelector('#hoverDotCash');
+  const dotPrincipal = svgEl.querySelector('#hoverDotPrincipal');
+  const dotTotal = svgEl.querySelector('#hoverDotTotal');
+
+  addChartPointerTracking(hoverCatcher, (clientX, clientY, isTouch) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = (clientX - rect.left) / rect.width * VB_W;
+    const age = Math.round(minAge + (relX - MARGIN.left) / plotW * (maxAge - minAge));
+    const idx = Math.min(Math.max(age - minAge, 0), rows.length - 1);
+    const r = rows[idx];
+    const x = xScale(r.age);
+
+    hoverLine.setAttribute('x1', x); hoverLine.setAttribute('x2', x); hoverLine.setAttribute('opacity', 1);
+    dotCash.setAttribute('cx', x); dotCash.setAttribute('cy', yScale(r.cash)); dotCash.setAttribute('opacity', 1);
+    dotPrincipal.setAttribute('cx', x); dotPrincipal.setAttribute('cy', yScale(r.cash+r.principal)); dotPrincipal.setAttribute('opacity', 1);
+    dotTotal.setAttribute('cx', x); dotTotal.setAttribute('cy', yScale(r.cash+r.invest)); dotTotal.setAttribute('opacity', 1);
+
+    tooltipEl.innerHTML = `
+      <div class="tt-age">${r.age}歳(${r.year}年)</div>
+      <div class="tt-cash">現金: ${yen(r.cash)}円</div>
+      <div class="tt-invest">運用: ${yen(r.invest)}円</div>
+      <div class="tt-principal">└ 元本: ${yen(r.principal)}円</div>
+      <div class="tt-gain${r.gain<0?' neg':''}">└ 運用損益: ${r.gain>=0?'+':''}${yen(r.gain)}円</div>
+      <div class="tt-note">この年の利回り: ${r.returnRate.toFixed(1)}% / 支出倍率: ${Math.round(r.expenseRatio*100)}%</div>
+      ${r.spotExpense>0.5 ? `<div class="tt-spot">スポット支出: ${yen(r.spotExpense)}円${r.spotLabel? `(${escapeHtml(r.spotLabel)})` : ''}</div>` : ''}
+      <div class="tt-total">合計: ${yen(r.total)}円</div>
+    `;
+    tooltipEl.style.opacity = 1;
+    // ツールチップはポインタのすぐ近くに追従させる(データ値の位置ではなく実際のカーソル位置基準)
+    placeTooltip(tooltipEl, wrap, clientX, clientY, isTouch);
+  }, () => {
+    tooltipEl.style.opacity = 0;
+    tooltipEl.style.transform = 'translate(-9999px,-9999px)';
+    hoverLine.setAttribute('opacity', 0);
+    dotCash.setAttribute('opacity', 0);
+    dotPrincipal.setAttribute('opacity', 0);
+    dotTotal.setAttribute('opacity', 0);
+  });
+}
+
+/* 収入(給与/DC年金/公的年金/取り崩し)の積み上げ棒グラフ+年間支出の折れ線。各年の実額は
+   年齢間で連続変化しないため(給与は退職で急に0になる等)、収入側は面/線グラフではなく棒グラフで
+   表現する。取り崩し額 = その年の税引後収入だけでは支出を賄えず、資産(現金・運用)から補った金額 */
+function renderIncomeChart(result){
+  const wrap = document.getElementById('incomeChartWrap');
+  const {VB_W, VB_H, MARGIN, fs} = chartBox(wrap);
+  const rows = result.rows;
+  const ages = rows.map(r=>r.age);
+  const minAge = ages[0], maxAge = ages[ages.length-1];
+  const pensionOf = r => r.pension + r.partnerPension + r.survivorPension; // テーブルの「公的年金」列と同じく本人+パートナー+遺族厚生年金の合算(ツールチップの合計表示用)
+  const barTotalOf = r => r.salary + r.postRetIncome + r.dc + pensionOf(r) + r.drawdown;
+  const totalExpenseOf = r => r.expense + r.insurancePremium + r.totalTax; // 生活費+保険料+税金=その年の実質的な支出総額
+
+  let maxVal = Math.max(0, ...rows.map(barTotalOf), ...rows.map(totalExpenseOf));
+  if(maxVal === 0) maxVal = 1;
+  maxVal *= 1.08;
+
+  const plotW = VB_W - MARGIN.left - MARGIN.right;
+  const plotH = VB_H - MARGIN.top - MARGIN.bottom;
+  const xScale = age => MARGIN.left + (age - minAge) / (maxAge - minAge || 1) * plotW;
+  const yScale = val => MARGIN.top + plotH - (val / maxVal) * plotH;
+
+  const bandW = plotW / rows.length;
+  const barW = Math.max(bandW * 0.62, 1);
+
+  const yStep = niceStep(maxVal, 5);
+  const yTicks = [];
+  for(let v = 0; v <= maxVal; v += yStep) yTicks.push(Math.round(v));
+
+  // 5の倍数の年齢を軸目盛りにし、両端(現在の年齢・試算終了年齢)は5の倍数でなくても表示する
+  const xTicks = [];
+  for(let a = Math.ceil(minAge/5)*5; a <= maxAge; a += 5) xTicks.push(a);
+  if(xTicks[0] !== minAge) xTicks.unshift(minAge);
+  if(xTicks[xTicks.length-1] !== maxAge) xTicks.push(maxAge);
+
+  // 公的年金は本人(加給年金は別セグメント)/パートナーで色分けし、取り崩しは投資資産の内訳グラフと同じ色にする
+  const SEGMENT_COLORS = ['var(--income-salary)', 'var(--income-postret)', 'var(--income-dc)', 'var(--income-pension)', 'var(--income-kakyu)', 'var(--income-pension-partner)', 'var(--income-survivor)', 'var(--invest-drawdown)'];
+  const bars = rows.map(r => {
+    const x = xScale(r.age) - barW/2;
+    let base = 0, rects = '';
+    [r.salary, r.postRetIncome, r.dc, r.pension - r.kakyuNenkin, r.kakyuNenkin, r.partnerPension, r.survivorPension, r.drawdown].forEach((v, i) => {
+      if(v > 0){
+        const y = yScale(base + v);
+        const h = yScale(base) - y;
+        rects += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h,0)}" fill="${SEGMENT_COLORS[i]}"/>`;
+      }
+      base += v;
+    });
+    return rects;
+  }).join('');
+
+  // 年間支出(生活費のみ)と、生活費+税金(実質支出)を折れ線で重ねて表示する。
+  // 2本の線の間隔がその年の税額に相当し、収入+取り崩しの棒とも視覚的に比較できる
+  const expenseLinePts = rows.map(r => `${xScale(r.age)},${yScale(r.expense)}`);
+  const totalExpenseLinePts = rows.map(r => `${xScale(r.age)},${yScale(totalExpenseOf(r))}`);
+
+  // スポット支出のある年は、支出線の上に印を付けて一時的な支出だと分かるようにする
+  const spotMarkers = rows.filter(r => r.spotExpense > 0.5)
+    .map(r => `<circle cx="${xScale(r.age)}" cy="${yScale(r.expense)}" r="3.6" fill="var(--accent-warn)" stroke="var(--bg-card)" stroke-width="1"/>`).join('');
+
+  const svg = `
+  <svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none">
+    ${yTicks.map(v => `
+      <line x1="${MARGIN.left}" y1="${yScale(v)}" x2="${VB_W-MARGIN.right}" y2="${yScale(v)}" stroke="var(--border-soft)" stroke-width="1"/>
+      <text x="${MARGIN.left-8}" y="${yScale(v)+3}" text-anchor="end" font-size="${fs}">${manyen(v)}万</text>
+    `).join('')}
+
+    ${xTicks.map(a => `<text x="${xScale(a)}" y="${VB_H-MARGIN.bottom+18}" text-anchor="middle" font-size="${fs}">${a}</text>`).join('')}
+    <text x="${(MARGIN.left+VB_W-MARGIN.right)/2}" y="${VB_H-4}" text-anchor="middle" font-size="${fs}" fill="var(--text-2)">年齢</text>
+
+    ${bars}
+    <polyline points="${expenseLinePts.join(' ')}" fill="none" stroke="var(--income-expense)" stroke-width="2" stroke-dasharray="6,5" stroke-linecap="round"/>
+    <polyline points="${totalExpenseLinePts.join(' ')}" fill="none" stroke="var(--income-total-expense)" stroke-width="2" stroke-dasharray="2,4" stroke-linecap="round"/>
+    ${spotMarkers}
+
+    <rect id="incomeHoverCatcher" x="${MARGIN.left}" y="${MARGIN.top}" width="${plotW}" height="${plotH}" fill="transparent"/>
+    <line id="incomeHoverLine" x1="0" y1="${MARGIN.top}" x2="0" y2="${VB_H-MARGIN.bottom}" stroke="var(--chart-hoverline)" stroke-width="1" opacity="0"/>
+    <circle id="incomeHoverDotExpense" r="3.5" fill="var(--income-expense)" opacity="0"/>
+    <circle id="incomeHoverDotTotalExpense" r="3.5" fill="var(--income-total-expense)" opacity="0"/>
+  </svg>`;
+
+  wrap.innerHTML = svg + wrap.querySelector('.chart-tooltip').outerHTML;
+  const tooltipEl = wrap.querySelector('.chart-tooltip');
+  const svgEl = wrap.querySelector('svg');
+  const hoverCatcher = svgEl.querySelector('#incomeHoverCatcher');
+  const hoverLine = svgEl.querySelector('#incomeHoverLine');
+  const dotExpense = svgEl.querySelector('#incomeHoverDotExpense');
+  const dotTotalExpense = svgEl.querySelector('#incomeHoverDotTotalExpense');
+
+  addChartPointerTracking(hoverCatcher, (clientX, clientY, isTouch) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = (clientX - rect.left) / rect.width * VB_W;
+    const age = Math.round(minAge + (relX - MARGIN.left) / plotW * (maxAge - minAge));
+    const idx = Math.min(Math.max(age - minAge, 0), rows.length - 1);
+    const r = rows[idx];
+    const x = xScale(r.age);
+    const total = barTotalOf(r);
+    const totalExpense = totalExpenseOf(r);
+
+    hoverLine.setAttribute('x1', x); hoverLine.setAttribute('x2', x); hoverLine.setAttribute('opacity', 1);
+    dotExpense.setAttribute('cx', x); dotExpense.setAttribute('cy', yScale(r.expense)); dotExpense.setAttribute('opacity', 1);
+    dotTotalExpense.setAttribute('cx', x); dotTotalExpense.setAttribute('cy', yScale(totalExpense)); dotTotalExpense.setAttribute('opacity', 1);
+
+    tooltipEl.innerHTML = `
+      <div class="tt-age">${r.age}歳(${r.year}年)</div>
+      <div class="tt-salary">給与: ${yen(r.salary)}円</div>
+      ${r.postRetIncome>0 ? `<div class="tt-postret">少額収入: ${yen(r.postRetIncome)}円</div>` : ''}
+      <div class="tt-dc">DC年金: ${yen(r.dc)}円</div>
+      <div class="tt-pension">公的年金(本人): ${yen(r.pension)}円</div>
+      ${r.kakyuNenkin>0 ? `<div class="tt-kakyu">└ 内 加給年金: ${yen(r.kakyuNenkin)}円</div>` : ''}
+      ${r.partnerPension>0 ? `<div class="tt-pension-partner">公的年金(パートナー${r.partnerAge}歳): ${yen(r.partnerPension)}円</div>` : ''}
+      ${r.survivorPension>0 ? `<div class="tt-survivor">遺族厚生年金(${r.primaryAlive?'本人':'パートナー'}が受給): ${yen(r.survivorPension)}円</div>` : ''}
+      <div class="tt-drawdown">取り崩し: ${yen(r.drawdown)}円</div>
+      <div class="tt-total">収入+取り崩し計: ${yen(total)}円</div>
+      <div class="tt-expense">年間支出(生活費): ${yen(r.expense)}円</div>
+      ${r.spotExpense>0.5 ? `<div class="tt-drawdown">内 スポット支出: ${yen(r.spotExpense)}円${r.spotLabel? `(${escapeHtml(r.spotLabel)})` : ''}</div>` : ''}
+      <div class="tt-total-expense">支出+保険料+税金(実質支出): ${yen(totalExpense)}円</div>
+    `;
+    tooltipEl.style.opacity = 1;
+    // ツールチップはポインタのすぐ近くに追従させる(データ値の位置ではなく実際のカーソル位置基準)
+    placeTooltip(tooltipEl, wrap, clientX, clientY, isTouch);
+  }, () => {
+    tooltipEl.style.opacity = 0;
+    tooltipEl.style.transform = 'translate(-9999px,-9999px)';
+    hoverLine.setAttribute('opacity', 0);
+    dotExpense.setAttribute('opacity', 0);
+    dotTotalExpense.setAttribute('opacity', 0);
+  });
+}
+
+/* 投資資産(NISA枠/特定口座/運用益/取り崩し/運用益課税)の積み上げ棒グラフ。
+   下3段(NISA元本+特定口座元本+運用益)は「残高」で、合計がその年の運用残高と一致する(二重計上なし)。
+   上2段(取り崩しの手取り+運用益課税)はその年の「フロー」で、合計がその年に売却した総額と一致する。
+   取り崩しの段を残高のすぐ上に置いてあるので、その下端=その年の運用残高、上端=取り崩さなければ
+   残っていた額の目安として読める。含み損(運用益がマイナス)の年は、バーの高さとしては0として扱う
+   (実際の値はツールチップに表示) */
+function renderInvestChart(result){
+  const wrap = document.getElementById('investChartWrap');
+  const {VB_W, VB_H, MARGIN, fs} = chartBox(wrap);
+  const rows = result.rows;
+  const ages = rows.map(r=>r.age);
+  const minAge = ages[0], maxAge = ages[ages.length-1];
+  const barTotalOf = r => r.nisaPrincipal + r.taxablePrincipal + Math.max(r.gain,0) + r.investSoldNet + r.gainsTax;
+
+  let maxVal = Math.max(0, ...rows.map(barTotalOf));
+  if(maxVal === 0) maxVal = 1;
+  maxVal *= 1.08;
+
+  const plotW = VB_W - MARGIN.left - MARGIN.right;
+  const plotH = VB_H - MARGIN.top - MARGIN.bottom;
+  const xScale = age => MARGIN.left + (age - minAge) / (maxAge - minAge || 1) * plotW;
+  const yScale = val => MARGIN.top + plotH - (val / maxVal) * plotH;
+
+  const bandW = plotW / rows.length;
+  const barW = Math.max(bandW * 0.62, 1);
+
+  const yStep = niceStep(maxVal, 5);
+  const yTicks = [];
+  for(let v = 0; v <= maxVal; v += yStep) yTicks.push(Math.round(v));
+
+  // 5の倍数の年齢を軸目盛りにし、両端(現在の年齢・試算終了年齢)は5の倍数でなくても表示する
+  const xTicks = [];
+  for(let a = Math.ceil(minAge/5)*5; a <= maxAge; a += 5) xTicks.push(a);
+  if(xTicks[0] !== minAge) xTicks.unshift(minAge);
+  if(xTicks[xTicks.length-1] !== maxAge) xTicks.push(maxAge);
+
+  const SEGMENT_COLORS = ['var(--invest-nisa)', 'var(--invest-taxable)', 'var(--invest-gain)', 'var(--invest-drawdown)', 'var(--invest-gain-tax)'];
+  const bars = rows.map(r => {
+    const x = xScale(r.age) - barW/2;
+    let base = 0, rects = '';
+    [r.nisaPrincipal, r.taxablePrincipal, Math.max(r.gain,0), r.investSoldNet, r.gainsTax].forEach((v, i) => {
+      if(v > 0){
+        const y = yScale(base + v);
+        const h = yScale(base) - y;
+        rects += `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h,0)}" fill="${SEGMENT_COLORS[i]}"/>`;
+      }
+      base += v;
+    });
+    return rects;
+  }).join('');
+
+  const svg = `
+  <svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none">
+    ${yTicks.map(v => `
+      <line x1="${MARGIN.left}" y1="${yScale(v)}" x2="${VB_W-MARGIN.right}" y2="${yScale(v)}" stroke="var(--border-soft)" stroke-width="1"/>
+      <text x="${MARGIN.left-8}" y="${yScale(v)+3}" text-anchor="end" font-size="${fs}">${manyen(v)}万</text>
+    `).join('')}
+
+    ${xTicks.map(a => `<text x="${xScale(a)}" y="${VB_H-MARGIN.bottom+18}" text-anchor="middle" font-size="${fs}">${a}</text>`).join('')}
+    <text x="${(MARGIN.left+VB_W-MARGIN.right)/2}" y="${VB_H-4}" text-anchor="middle" font-size="${fs}" fill="var(--text-2)">年齢</text>
+
+    ${bars}
+
+    <rect id="investHoverCatcher" x="${MARGIN.left}" y="${MARGIN.top}" width="${plotW}" height="${plotH}" fill="transparent"/>
+    <line id="investHoverLine" x1="0" y1="${MARGIN.top}" x2="0" y2="${VB_H-MARGIN.bottom}" stroke="var(--chart-hoverline)" stroke-width="1" opacity="0"/>
+  </svg>`;
+
+  wrap.innerHTML = svg + wrap.querySelector('.chart-tooltip').outerHTML;
+  const tooltipEl = wrap.querySelector('.chart-tooltip');
+  const svgEl = wrap.querySelector('svg');
+  const hoverCatcher = svgEl.querySelector('#investHoverCatcher');
+  const hoverLine = svgEl.querySelector('#investHoverLine');
+
+  addChartPointerTracking(hoverCatcher, (clientX, clientY, isTouch) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = (clientX - rect.left) / rect.width * VB_W;
+    const age = Math.round(minAge + (relX - MARGIN.left) / plotW * (maxAge - minAge));
+    const idx = Math.min(Math.max(age - minAge, 0), rows.length - 1);
+    const r = rows[idx];
+    const x = xScale(r.age);
+
+    hoverLine.setAttribute('x1', x); hoverLine.setAttribute('x2', x); hoverLine.setAttribute('opacity', 1);
+
+    tooltipEl.innerHTML = `
+      <div class="tt-age">${r.age}歳(${r.year}年)</div>
+      <div class="tt-nisa">NISA枠(元本): ${yen(r.nisaPrincipal)}円</div>
+      <div class="tt-taxable">特定口座(元本): ${yen(r.taxablePrincipal)}円</div>
+      <div class="tt-invgain${r.gain<0?' neg':''}">運用益: ${r.gain>=0?'+':''}${yen(r.gain)}円</div>
+      <div class="tt-invdrawdown">取り崩し(売却手取り): ${yen(r.investSoldNet)}円</div>
+      <div class="tt-invtax">運用益課税: ${yen(r.gainsTax)}円</div>
+      ${r.investSoldNet+r.gainsTax > 0.5 ? `<div class="tt-invdrawdown">└ 売却総額: ${yen(r.investSoldNet+r.gainsTax)}円</div>` : ''}
+      <div class="tt-total">運用残高計: ${yen(r.invest)}円</div>
+    `;
+    tooltipEl.style.opacity = 1;
+    // ツールチップはポインタのすぐ近くに追従させる(データ値の位置ではなく実際のカーソル位置基準)
+    placeTooltip(tooltipEl, wrap, clientX, clientY, isTouch);
+  }, () => {
+    tooltipEl.style.opacity = 0;
+    tooltipEl.style.transform = 'translate(-9999px,-9999px)';
+    hoverLine.setAttribute('opacity', 0);
+  });
+}
+
+function renderStats(result, p){
+  const last = result.rows[result.rows.length-1];
+  const el = document.getElementById('statRow');
+  const cards = [
+    {label:`${last.age}歳時点の総資産`, value: manyen(last.total)+'<small>万円</small>', accent:'var(--accent-invest)', warn: last.total<0},
+    {label:'資産ピーク額', value: manyen(result.peak)+'<small>万円</small>', accent:'var(--accent-good)'},
+    {label:'取り崩し開始年齢', value: (result.drawdownAge!=null? result.drawdownAge+'<small>歳</small>' : '—'), accent:'var(--accent-cash)'},
+    {label:'生涯収入(税引前)', value: manyen(result.cumulativeIncome)+'<small>万円</small>', accent:'var(--accent-good)'},
+    {label:'生涯支出総額(インフレ加味後)', value: manyen(result.cumulativeExpense)+'<small>万円</small>', accent:'var(--accent-cash)'},
+    {label:'生涯納税額(概算)', value: manyen(result.cumulativeTax)+'<small>万円</small>', accent:'var(--accent-invest)'},
+    {label:'内 運用益課税(概算)', value: manyen(result.cumulativeGainsTax)+'<small>万円</small>', accent:'var(--accent-principal)'},
+    {label:'運用益累計(税引前)', value: manyen(result.cumulativeGain)+'<small>万円</small>', accent:'var(--accent-good)', warn: result.cumulativeGain<0},
+  ];
+  if(result.depletionAge!=null){
+    cards.push({label:'資産枯渇年齢', value: result.depletionAge+'<small>歳</small>', accent:'var(--accent-warn)', warn:true});
+  }
+  if(last.age < p.simEndAge){
+    cards.push({label:'両者死亡による試算終了年齢', value: last.age+'<small>歳</small>', accent:'var(--accent-cash)'});
+  }
+  el.innerHTML = cards.map(c=>`
+    <div class="stat-card" style="--stat-accent:${c.accent}">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-value ${c.warn?'warn':''}">${c.value}</div>
+    </div>
+  `).join('');
+  // インラインの grid-template-columns だとメディアクエリを上書きしてしまい、
+  // 狭い画面でもカードが1行に詰め込まれてしまうため、カスタムプロパティで枚数だけ渡す
+  el.style.setProperty('--stat-count', cards.length);
+}
+
+function renderTable(result){
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = result.rows.map((r,i)=>{
+    let cls = '';
+    if(result.drawdownAge===r.age) cls += ' row-drawdown';
+    if(result.depletionAge!=null && r.age>=result.depletionAge) cls += ' row-depleted';
+    const negCls = r.total<0 ? ' neg' : '';
+    return `<tr class="${cls}" data-row-idx="${i}">
+      <td>${r.age}歳</td>
+      <td>${r.salary? yen(r.salary):'—'}</td>
+      <td>${r.postRetIncome? yen(r.postRetIncome):'—'}</td>
+      <td data-col="lump">${r.lump? yen(r.lump):'—'}</td>
+      <td>${r.dc? yen(r.dc):'—'}</td>
+      <td data-col="pension">${(r.pension+r.partnerPension+r.survivorPension)? yen(r.pension+r.partnerPension+r.survivorPension):'—'}</td>
+      <td data-col="expense">${yen(r.expense+r.insurancePremium)} <span class="tax-sub">(${r.insurancePremium>0.5? yen(r.insurancePremium) : '—'})</span></td>
+      <td>${r.spotExpense>0.5 ? yen(r.spotExpense) : '—'}${r.spotLabel? ` <span class="tax-sub">(${escapeHtml(r.spotLabel)})</span>` : ''}</td>
+      <td data-col="tax">${yen(r.totalTax)} <span class="tax-sub">(${r.gainsTax>0.5? yen(r.gainsTax) : '—'})</span></td>
+      <td class="${r.netCashFlow<0?'neg':''}" data-col="netcf">${yen(r.netCashFlow)}</td>
+      <td>${yen(r.cash)}</td>
+      <td data-col="invest">${yen(r.invest)}</td>
+      <td class="${negCls}" data-col="total">${yen(r.total)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* 表の各セルにマウスオーバーしたときの内訳ツールチップ。 .table-scroll は横・縦にスクロールするため、
+   .chart-tooltip のような親要素基準の絶対配置ではスクロール領域でクリップされてしまう。
+   position:fixed のツールチップをカーソル位置に合わせて動かすことでこれを避ける */
+function buildTableTipHTML(col, r){
+  const y = n => `${yen(n)}円`;
+  const pct = (num, den) => den > 0.5 ? `${(num/den*100).toFixed(1)}%` : '—';
+  switch(col){
+    case 'pension': {
+      if((r.pension+r.partnerPension+r.survivorPension) <= 0.5) return '';
+      return `<div class="tt-age">公的年金の内訳</div>
+        ${r.pension>0.5 ? `<div class="tt-pension">本人: ${y(r.pension)}</div>` : ''}
+        ${r.kakyuNenkin>0.5 ? `<div class="tt-kakyu">└ 内 加給年金: ${y(r.kakyuNenkin)}</div>` : ''}
+        ${r.partnerPension>0.5 ? `<div class="tt-pension-partner">パートナー(${r.partnerAge}歳): ${y(r.partnerPension)}</div>` : ''}
+        ${r.survivorPension>0.5 ? `<div class="tt-survivor">遺族厚生年金(${r.primaryAlive?'本人':'パートナー'}が受給): ${y(r.survivorPension)}</div>` : ''}
+        <div class="tt-total">合計: ${y(r.pension+r.partnerPension+r.survivorPension)}</div>`;
+    }
+    case 'lump': {
+      if(r.lump <= 0.5) return '';
+      return `<div class="tt-age">退職金の内訳</div>
+        <div>退職金(額面): ${y(r.lump)}</div>
+        <div class="tt-note">└ 退職所得控除: ${y(r.lumpDeduction)}</div>
+        <div class="tt-note">└ 課税退職所得(1/2課税): ${y(r.lumpTaxable)}</div>
+        <div class="tt-invtax">税額: ${y(r.lumpTax)}(実効税率 ${pct(r.lumpTax, r.lump)})</div>
+        <div class="tt-total">手取り: ${y(r.lump - r.lumpTax)}</div>`;
+    }
+    case 'expense': {
+      return `<div class="tt-age">支出の内訳</div>
+        <div class="tt-expense">生活費: ${y(r.baseExpense)}</div>
+        ${r.spotExpense>0.5 ? `<div class="tt-spot">スポット支出: ${y(r.spotExpense)}${r.spotLabel? `(${escapeHtml(r.spotLabel)})` : ''}</div>` : ''}
+        <div class="tt-invtax">保険料: ${y(r.insurancePremium)}</div>
+        <div class="tt-total">合計: ${y(r.expense + r.insurancePremium)}</div>
+        <div class="tt-note">支出倍率: ${Math.round(r.expenseRatio*100)}%</div>`;
+    }
+    case 'tax': {
+      if(r.totalTax <= 0.5 && r.gainsTax <= 0.5) return '';
+      const parts = [];
+      if(r.otherTax > 0.5) parts.push(`<div>給与・少額収入・DC・公的年金分: ${y(r.otherTax)}(実効税率 ${pct(r.otherTax, r.salary+r.postRetIncome+r.dc+r.pension)})</div>`);
+      if(r.partnerTax > 0.5) parts.push(`<div>パートナー年金分: ${y(r.partnerTax)}(実効税率 ${pct(r.partnerTax, r.partnerPension)})</div>`);
+      if(r.lumpTax > 0.5) parts.push(`<div>退職金分: ${y(r.lumpTax)}(実効税率 ${pct(r.lumpTax, r.lump)})</div>`);
+      if(r.gainsTax > 0.5) parts.push(`<div class="tt-invtax">運用益課税: ${y(r.gainsTax)}(税率 ${r.gainsTaxRatePct.toFixed(3)}%)</div>`);
+      return `<div class="tt-age">税金の内訳</div>${parts.join('')}<div class="tt-total">合計: ${y(r.totalTax)}</div>`;
+    }
+    case 'netcf': {
+      const income = r.salary + r.postRetIncome + r.dc + r.pension + r.partnerPension;
+      const nonGainsTax = r.otherTax + r.partnerTax; // 純CFには運用益課税(売却時源泉)は含まない
+      return `<div class="tt-age">純CFの内訳</div>
+        <div class="tt-salary">収入計: ${y(income)}</div>
+        <div class="tt-invtax">└ 税金(給与・年金分): -${y(nonGainsTax)}</div>
+        <div class="tt-invtax">└ 保険料: -${y(r.insurancePremium)}</div>
+        <div class="tt-expense">支出: -${y(r.expense)}</div>
+        <div class="tt-total${r.netCashFlow<0?' neg':''}">純CF: ${r.netCashFlow>=0?'+':''}${y(r.netCashFlow)}</div>
+        ${r.lump>0.5 ? '<div class="tt-note">※ 退職金(税引後)は純CFに含まず、現金・運用資産へ別途配分</div>' : ''}`;
+    }
+    case 'invest': {
+      if(r.invest <= 0.5) return '';
+      return `<div class="tt-age">運用残高の内訳</div>
+        <div class="tt-nisa">NISA枠(元本): ${y(r.nisaPrincipal)}</div>
+        <div class="tt-taxable">特定口座(元本): ${y(r.taxablePrincipal)}</div>
+        <div class="tt-invgain${r.gain<0?' neg':''}">運用益(含み益): ${r.gain>=0?'+':''}${y(r.gain)}</div>
+        <div class="tt-total">合計: ${y(r.invest)}</div>`;
+    }
+    case 'total': {
+      return `<div class="tt-age">総資産の内訳</div>
+        <div class="tt-cash">現金残高: ${y(r.cash)}</div>
+        <div class="tt-invest">運用残高: ${y(r.invest)}</div>
+        <div class="tt-total">合計: ${y(r.total)}</div>`;
+    }
+    default: return '';
+  }
+}
+
+function initTableTooltip(){
+  const tooltip = document.getElementById('tableTooltip');
+  const scroll = document.querySelector('.table-scroll');
+  if(!tooltip || !scroll) return;
+  let currentCell = null;
+
+  const position = e => {
+    const pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    const rect = tooltip.getBoundingClientRect();
+    if(x + rect.width > window.innerWidth - 8) x = e.clientX - rect.width - pad;
+    if(y + rect.height > window.innerHeight - 8) y = e.clientY - rect.height - pad;
+    tooltip.style.transform = `translate(${Math.max(x,4)}px, ${Math.max(y,4)}px)`;
+  };
+  const hide = () => {
+    tooltip.style.opacity = '0';
+    tooltip.style.transform = 'translate(-9999px,-9999px)';
+    currentCell = null;
+  };
+  const show = (e, cell) => {
+    const rowEl = cell.closest('tr');
+    const idx = rowEl ? Number(rowEl.dataset.rowIdx) : NaN;
+    const r = lastResult && !Number.isNaN(idx) ? lastResult.rows[idx] : null;
+    const html = r ? buildTableTipHTML(cell.dataset.col, r) : '';
+    if(!html){ hide(); return; }
+    currentCell = cell;
+    tooltip.innerHTML = html;
+    tooltip.style.opacity = '1';
+    position(e);
+  };
+
+  scroll.addEventListener('mouseover', e => {
+    const cell = e.target.closest('td[data-col]');
+    if(!cell){ hide(); return; }
+    if(cell !== currentCell) show(e, cell);
+  });
+  scroll.addEventListener('mousemove', e => {
+    if(!currentCell) return;
+    const cell = e.target.closest('td[data-col]');
+    if(cell !== currentCell){ hide(); return; }
+    position(e);
+  });
+  scroll.addEventListener('mouseout', e => {
+    const cell = e.target.closest('td[data-col]');
+    if(cell && (!e.relatedTarget || !cell.contains(e.relatedTarget))) hide();
+  });
+  scroll.addEventListener('scroll', hide);
+}
+
+/* Google Sheets へ貼り付けやすいよう、画面上の年次内訳を数値のTSVとして作る。
+   Google Sheets API を使わないため、OAuthのクライアントIDや利用者の認可情報をHTMLに
+   持たせずに済む。Google Sheets側でA1に貼り付けると列として展開される。 */
+function buildAnnualBreakdownTSV(result){
+  const headers = [
+    '年齢', '給与', '少額収入', '退職金', 'DC年金', '公的年金', '内 加給年金', '内 遺族厚生年金',
+    '支出', '内 保険料', '内 スポット支出', 'スポット支出名',
+    '税金計', '内 運用益課税', '純CF', '現金残高', '運用残高', '総資産'
+  ];
+  const amount = value => String(Math.round(value || 0));
+  const cleanText = value => String(value || '').replace(/[\t\r\n]/g, ' ');
+  const rows = result.rows.map(r => [
+    r.age, amount(r.salary), amount(r.postRetIncome), amount(r.lump), amount(r.dc), amount(r.pension + r.partnerPension + r.survivorPension), amount(r.kakyuNenkin), amount(r.survivorPension),
+    amount(r.expense + r.insurancePremium), amount(r.insurancePremium), amount(r.spotExpense), cleanText(r.spotLabel),
+    amount(r.totalTax), amount(r.gainsTax), amount(r.netCashFlow), amount(r.cash), amount(r.invest), amount(r.total),
+  ]);
+  return [headers, ...rows].map(row => row.join('\t')).join('\n');
+}
+
+async function copyTextToClipboard(text){
+  if(navigator.clipboard && window.isSecureContext){
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  if(!copied) throw new Error('clipboard copy failed');
+}
+
+async function exportAnnualBreakdownToSheets(){
+  const status = document.getElementById('sheetsStatus');
+  if(!lastResult){
+    status.textContent = '先にシミュレーションを実行してください。';
+    status.classList.add('error');
+    return;
+  }
+  // 非同期処理前に開くことで、ブラウザのポップアップブロックを避ける。
+  const sheetWindow = window.open('https://docs.google.com/spreadsheets/create', '_blank');
+  try{
+    await copyTextToClipboard(buildAnnualBreakdownTSV(lastResult));
+    status.textContent = sheetWindow ? 'コピーしました。開いたシートの A1 に貼り付けてください。' : 'コピーしました。Google スプレッドシートの A1 に貼り付けてください。';
+    status.classList.remove('error');
+  } catch(e){
+    status.textContent = 'コピーできませんでした。ブラウザのクリップボード権限をご確認ください。';
+    status.classList.add('error');
+  }
+}
+
+let lastResult = null; // 画面サイズが変わったときにグラフだけ描き直すために保持する
+
+function calculate(){
+  const p = readParams();
+  const result = runSimulation(p);
+  lastResult = result;
+  renderStats(result, p);
+  renderChart(result);
+  renderInvestChart(result);
+  renderIncomeChart(result);
+  renderTable(result);
+}
+
+/* SVGの座標系は描画領域の実サイズに合わせているため、幅が変わったら描き直す
+   (画面の回転、ウィンドウのリサイズ、グループの開閉によるレイアウト変化) */
+function redrawCharts(){
+  if(!lastResult) return;
+  renderChart(lastResult);
+  renderInvestChart(lastResult);
+  renderIncomeChart(lastResult);
+}
+let redrawTimer = null;
+function scheduleRedraw(){
+  clearTimeout(redrawTimer);
+  redrawTimer = setTimeout(redrawCharts, 180);
+}
+window.addEventListener('resize', scheduleRedraw);
+window.addEventListener('orientationchange', scheduleRedraw);
+
+/* ================= 入力グループの折りたたみ ================= */
+// 各 .group の見出し以降の要素を .group-body でまとめ、見出しのタップで開閉できるようにする。
+// HTML側を書き換えずに済ませることで、保存・復元やPDFサマリー(.group / .group-title を
+// 手がかりに項目を集めている)の処理をそのまま使える
+const MOBILE_MAX_WIDTH = 920;
+const isMobileLayout = () => window.matchMedia
+  ? window.matchMedia(`(max-width:${MOBILE_MAX_WIDTH}px)`).matches
+  : window.innerWidth <= MOBILE_MAX_WIDTH;
+function initCollapsibleGroups(){
+  document.querySelectorAll('.panel-scroll .group').forEach(group => {
+    const title = group.querySelector('.group-title');
+    if(!title || group.querySelector(':scope > .group-body')) return;
+
+    const body = document.createElement('div');
+    body.className = 'group-body';
+    while(title.nextSibling) body.appendChild(title.nextSibling);
+    group.appendChild(body);
+
+    const caret = document.createElement('span');
+    caret.className = 'group-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    title.appendChild(caret);
+
+    title.setAttribute('role', 'button');
+    title.setAttribute('tabindex', '0');
+    const toggle = () => {
+      group.classList.toggle('collapsed');
+      title.setAttribute('aria-expanded', String(!group.classList.contains('collapsed')));
+      scheduleRedraw(); // 開閉でグラフの幅が変わることがあるため描き直す
+    };
+    title.addEventListener('click', toggle);
+    title.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); }
+    });
+  });
+  applyGroupDefaults();
+}
+function setGroupsCollapsed(collapse){
+  document.querySelectorAll('.panel-scroll .group').forEach(group => {
+    group.classList.toggle('collapsed', collapse);
+    const title = group.querySelector('.group-title');
+    if(title) title.setAttribute('aria-expanded', String(!collapse));
+  });
+}
+/* スマホでは既定で全部閉じ、PCでは開いたままにする */
+function applyGroupDefaults(){
+  setGroupsCollapsed(isMobileLayout());
+}
+// 固定フィールドの「すべて展開/すべて折りたたむ」ボタン。全項目を一括で開閉する
+document.getElementById('expandAllBtn').addEventListener('click', () => {
+  setGroupsCollapsed(false);
+  scheduleRedraw();
+});
+document.getElementById('collapseAllBtn').addEventListener('click', () => {
+  setGroupsCollapsed(true);
+  scheduleRedraw();
+});
+// 画面幅がスマホ/PCの境界をまたいだときだけ既定状態に戻す(手動の開閉は維持したいため)
+let wasMobile = isMobileLayout();
+window.addEventListener('resize', () => {
+  const isMobile = isMobileLayout();
+  if(isMobile !== wasMobile){ wasMobile = isMobile; applyGroupDefaults(); }
+});
+// 印刷時はサイドバー自体が非表示になり、入力内容は buildPrintSummaryHTML() が
+// 別途一覧化するため、折りたたみ状態はPDF出力に影響しない
+
+/* ================= スポット支出の行の追加・削除 ================= */
+// 3行ぶんの入力欄はHTMLに固定で用意しておき、値が入っている行だけを表示する。
+// こうしておくと、保存・復元やPDF出力の処理は他の入力欄とまったく同じ扱いで済む
+const SPOT_COUNT = 3;
+function spotRowHasValue(i){
+  const name = document.getElementById('spotName'+i).value.trim();
+  const age = document.getElementById('spotAge'+i).value.trim();
+  const amount = parseAmount(document.getElementById('spotAmount'+i).value);
+  return !!name || !!age || amount > 0;
+}
+function syncSpotRows(){
+  for(let i=2; i<=SPOT_COUNT; i++){
+    const row = document.querySelector(`.spot-row[data-spot="${i}"]`);
+    if(row) row.hidden = !spotRowHasValue(i);
+  }
+  updateSpotAddBtn();
+}
+function updateSpotAddBtn(){
+  const btn = document.getElementById('spotAddBtn');
+  if(!btn) return;
+  btn.hidden = ![...document.querySelectorAll('.spot-row')].some(row => row.hidden);
+}
+function clearSpotRow(i){
+  document.getElementById('spotName'+i).value = '';
+  document.getElementById('spotAge'+i).value = '';
+  document.getElementById('spotAmount'+i).value = '';
+  document.getElementById('spotInflate'+i).checked = false;
+}
+document.getElementById('spotAddBtn').addEventListener('click', () => {
+  const next = [...document.querySelectorAll('.spot-row')].find(row => row.hidden);
+  if(next){
+    next.hidden = false;
+    const input = next.querySelector('input[type=text]');
+    if(input) input.focus();
+  }
+  updateSpotAddBtn();
+});
+document.querySelectorAll('.spot-del').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const i = Number(btn.dataset.spot);
+    clearSpotRow(i);
+    const row = document.querySelector(`.spot-row[data-spot="${i}"]`);
+    if(row && i > 1) row.hidden = true; // 1行目は常に表示したままにする
+    updateSpotAddBtn();
+  });
+});
+
+/* ================= NISAオプションの依存関係 ================= */
+// 「NISA枠を優先して埋める」がOFFのときは、NISAへの積立自体を行わないため、
+// 積立ペースと移し替えの設定は意味がなくなる。入力を無効化して依存関係が分かるようにする
+function syncNisaOptions(){
+  const on = document.getElementById('nisaPriority').checked;
+  ['nisaPacedInvesting','nisaRelay'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.disabled = !on;
+    el.closest('label.checkline').classList.toggle('disabled', !on);
+  });
+}
+document.getElementById('nisaPriority').addEventListener('change', syncNisaOptions);
+
+/* ================= 公的年金の繰上げ・繰下げの目安表示 ================= */
+function updatePensionAdjustNote(){
+  const el = document.getElementById('pensionAdjustNote');
+  if(!el) return;
+  const num = id => parseAmount(document.getElementById(id).value);
+  if(!document.getElementById('applyPensionAdjust').checked){
+    el.textContent = '自動調整はOFF。入力した年額を、そのまま受給開始年齢から受け取る前提で試算します';
+    return;
+  }
+  const describe = (label, annual, startAge) => {
+    const rate = pensionAdjustRate(startAge);
+    const pct = (rate*100).toFixed(1).replace(/\.0$/, '');
+    return `${label} ${startAge}歳開始 → ${rate>=0?'+':''}${pct}% = 年額 ${Math.round(annual*(1+rate)).toLocaleString('en-US')}円`;
+  };
+  const primaryAnnual = num('primaryBasicPension') + num('primaryKouseiPension');
+  const partnerAnnual = num('partnerBasicPension') + num('partnerKouseiPension');
+  const lines = [describe('本人:', primaryAnnual, num('pensionStartAge'))];
+  if(partnerAnnual > 0){
+    const partnerStartAge = num('partnerPensionStartAge');
+    // パートナーが受給を始めるのは本人が何歳のときかも併記する(年齢差を入れているため直感的に分かりにくい)
+    const selfAgeAtStart = partnerStartAge - Math.round(num('partnerAgeDiff'));
+    lines.push(describe('パートナー:', partnerAnnual, partnerStartAge) + `(本人${selfAgeAtStart}歳のとき)`);
+  }
+  el.textContent = `老齢基礎年金+老齢厚生年金の合計額を65歳開始時の額とみなして調整 — ${lines.join(' / ')}(繰上げ -0.4%/月・最大-24%、繰下げ +0.7%/月・最大+84%。60〜75歳の範囲で適用)`;
+}
+['primaryBasicPension','primaryKouseiPension','pensionStartAge','partnerBasicPension','partnerKouseiPension','partnerPensionStartAge','partnerAgeDiff','applyPensionAdjust'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updatePensionAdjustNote);
+});
+
+/* ================= パートナーの死亡年齢は「パートナー自身の年齢」指定のため、
+   本人が何歳のときに当たるかをその場で表示する(年齢差があると直感的に分かりにくいため) */
+function updatePartnerDeathAgeNote(){
+  const el = document.getElementById('partnerDeathAgeNote');
+  if(!el) return;
+  const num = id => parseAmount(document.getElementById(id).value);
+  const partnerDeathAge = num('partnerDeathAge');
+  const selfAgeAtDeath = Math.round(partnerDeathAge - num('partnerAgeDiff'));
+  const simEndAge = num('simEndAge');
+  let note = `本人が${selfAgeAtDeath}歳のとき`;
+  if(selfAgeAtDeath > simEndAge){
+    note += `(試算終了年齢${simEndAge}歳より後のため、この試算では死亡しません)`;
+  }
+  el.textContent = note;
+}
+['partnerDeathAge','partnerAgeDiff','simEndAge'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updatePartnerDeathAgeNote);
+});
+
+/* ================= 設定の保存・読み込み(localStorage / window.storage) ================= */
+const INPUT_IDS = [
+  'currentAge','simEndAge','retirementAge',
+  'salaryPhase1','salaryPhase2StartAge','salaryPhase2',
+  'postRetIncome','postRetIncomeStartAge','postRetIncomeYears',
+  'lumpSum','lumpSumAge','serviceYears','lumpSumCashRatio',
+  'dcTotal','dcStartAge','dcYears',
+  'primaryBasicPension','primaryKouseiPension','pensionStartAge',
+  'partnerBasicPension','partnerKouseiPension','partnerAgeDiff','partnerPensionStartAge','kakyuNenkinAmount',
+  'primaryDeathAge','partnerDeathAge',
+  'annualExpense','inflationRate',
+  'expRent','expUtility','expCommunication','expFood','expDaily','expCarTax','expInsurance','expSocial','expFixed','expOther',
+  'expenseRatioUnder75','expenseRatio75to84','expenseRatio85plus',
+  'spotName1','spotAge1','spotAmount1','spotName2','spotAge2','spotAmount2','spotName3','spotAge3','spotAmount3',
+  'returnRateUnder65','returnRate66to75','returnRate76plus',
+  'workingInsuranceRate','retiredInsuranceAnnual','medicalExpenseAnnual',
+  'investStart','cashStart','investReturnRate','cashTargetAmount',
+  'principalMethod', // select だが value で読み書きできるため同じ扱い
+  'nisaAnnualLimit','nisaLifetimeLimit','nisaStart','gainsTaxRate',
+];
+const CHECKBOX_IDS = ['applyTax','applyExtraDeductions','hasSpouseDeduction','maintainCashTarget','applyGainsTax',
+  'nisaPriority','nisaPacedInvesting','nisaRelay',
+  'applyPensionAdjust','primarySurvivorEligible','partnerSurvivorEligible','applyKakyuNenkin','kakyuNenkinEligible',
+  'applyPrimaryDeath','applyPartnerDeath','applySurvivorPension',
+  'useGlidePath','spotInflate1','spotInflate2','spotInflate3'];
+const STORAGE_KEY = 'retirement-dashboard-params';
+
+let saveStatusTimer = null;
+function showSaveStatus(msg, kind){
+  const el = document.getElementById('saveStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.classList.toggle('error', kind === 'error');
+  el.classList.toggle('muted', kind === 'muted');
+  el.classList.add('show');
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(()=>{ el.classList.remove('show'); }, 4000);
+}
+
+/* HTML に直接書かれている初期値。「初期値」ボタンでここへ戻す */
+const DEFAULT_VALUES = {};
+function captureDefaults(){
+  INPUT_IDS.forEach(id => { DEFAULT_VALUES[id] = document.getElementById(id).value; });
+  CHECKBOX_IDS.forEach(id => { DEFAULT_VALUES[id] = document.getElementById(id).checked; });
+}
+
+function collectFormValues(){
+  const values = {};
+  INPUT_IDS.forEach(id => { values[id] = document.getElementById(id).value; });
+  CHECKBOX_IDS.forEach(id => { values[id] = document.getElementById(id).checked; });
+  return values;
+}
+/* 旧形式の保存データを現在の入力項目へ読み替える。
+   partnerPensionStartOffset(本人の受給開始年齢からの年数。当時はパートナーの年齢=本人の年齢という前提)
+   → partnerAgeDiff=0 / partnerPensionStartAge=本人の受給開始年齢+その年数 */
+function migrateFormValues(values){
+  if(!values || values.partnerPensionStartOffset === undefined) return values;
+  const migrated = {...values};
+  if(migrated.partnerPensionStartAge === undefined){
+    const selfStart = parseAmount(migrated.pensionStartAge);
+    migrated.partnerPensionStartAge = String(selfStart + parseAmount(migrated.partnerPensionStartOffset));
+    migrated.partnerAgeDiff = '0';
+  }
+  delete migrated.partnerPensionStartOffset;
+  return migrated;
+}
+
+function applyFormValues(rawValues){
+  const values = migrateFormValues(rawValues);
+  if(!values) return;
+  INPUT_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el && values[id] !== undefined){
+      el.value = values[id];
+      if(AMOUNT_INPUT_IDS.includes(id)) el.value = formatAmountValue(el.value);
+    }
+  });
+  CHECKBOX_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el && values[id] !== undefined) el.checked = !!values[id];
+  });
+  syncSpotRows();
+  syncNisaOptions();
+  updatePensionAdjustNote();
+  updatePartnerDeathAgeNote();
+}
+
+/* 保存形式: {savedAt, values}。旧形式(値だけのフラットなオブジェクト)も読めるようにしておく */
+function serialize(values){
+  return JSON.stringify({savedAt: new Date().toISOString(), values});
+}
+function deserialize(json){
+  const parsed = JSON.parse(json);
+  return parsed && parsed.values ? parsed : {savedAt:null, values: parsed};
+}
+function formatSavedAt(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const p = n => String(n).padStart(2,'0');
+  return ` (${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())})`;
+}
+
+/* localStorage: どの環境でも使える基本の保存先(プライベートモード等では例外になり得る) */
+function localSave(json){
+  try{ localStorage.setItem(STORAGE_KEY, json); return true; }
+  catch(e){ console.warn('localStorage への保存に失敗:', e); return false; }
+}
+function localLoad(){
+  try{ return localStorage.getItem(STORAGE_KEY); }
+  catch(e){ return null; }
+}
+function localClear(){
+  try{ localStorage.removeItem(STORAGE_KEY); } catch(e){}
+}
+
+/* window.storage: Claude.ai の Publish 済みアーティファクトでのみ利用可能(あれば併用) */
+async function artifactSave(json){
+  if(!window.storage) return false;
+  try{ return !!(await window.storage.set(STORAGE_KEY, json, false)); }
+  catch(e){ console.warn('window.storage への保存に失敗:', e); return false; }
+}
+async function artifactLoad(){
+  if(!window.storage) return null;
+  try{
+    const result = await window.storage.get(STORAGE_KEY, false);
+    return result && result.value ? result.value : null;
+  } catch(e){ return null; }
+}
+
+async function saveParams(){
+  const json = serialize(collectFormValues());
+  const okLocal = localSave(json);
+  const okArtifact = await artifactSave(json);
+  if(okLocal || okArtifact){
+    showSaveStatus('保存しました' + formatSavedAt(new Date().toISOString()));
+  } else {
+    showSaveStatus('保存できませんでした(ブラウザの設定をご確認ください)', 'error');
+  }
+}
+
+/* 保存済みデータを読む。window.storage を優先し、なければ localStorage */
+async function readStored(){
+  const fromArtifact = await artifactLoad();
+  const json = fromArtifact || localLoad();
+  if(!json) return null;
+  try{ return deserialize(json); }
+  catch(e){ console.warn('保存データを解析できませんでした:', e); return null; }
+}
+
+async function loadParams(options){
+  const silent = options && options.silent;
+  const stored = await readStored();
+  if(!stored){
+    if(!silent) showSaveStatus('保存された設定はありません', 'muted');
+    return false;
+  }
+  applyFormValues(stored.values);
+  setLoadedParamFileName('');
+  showSaveStatus('保存内容を復元しました' + formatSavedAt(stored.savedAt));
+  return true;
+}
+
+function resetParams(){
+  if(!confirm('入力内容を初期値に戻します。保存済みのデータも削除されます。よろしいですか?')) return;
+  applyFormValues(DEFAULT_VALUES);
+  localClear();
+  setLoadedParamFileName('');
+  calculate();
+  showSaveStatus('初期値に戻しました', 'muted');
+}
+
+/* ================= パラメータのファイル出力・読込 ================= */
+function fileTimestamp(d){
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+/* ファイルへの書き出し。File System Access API 対応ブラウザ(Chrome/Edge等)では
+   保存ダイアログで任意の保存先を選べるようにし、既定の場所としてダウンロードフォルダを提案する。
+   非対応ブラウザでは <a download> によるブラウザ標準のダウンロード(既定のダウンロードフォルダへ保存)にフォールバックする */
+async function exportParamsToFile(){
+  const json = serialize(collectFormValues());
+  const filename = `retirement-dashboard-params-${fileTimestamp(new Date())}.json`;
+  if(window.showSaveFilePicker){
+    try{
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        startIn: 'downloads',
+        types: [{description: 'JSON', accept: {'application/json': ['.json']}}],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      showSaveStatus('ファイルに保存しました');
+      return;
+    }catch(e){
+      if(e.name === 'AbortError') return; // ユーザーが保存をキャンセルした
+      console.warn('ファイル保存に失敗、ダウンロード方式にフォールバックします:', e);
+    }
+  }
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showSaveStatus('ファイルをダウンロードしました');
+}
+
+function setLoadedParamFileName(name){
+  const label = document.getElementById('loadedParamFileName');
+  if(!label) return;
+  const safeName = (name || '').trim();
+  label.textContent = safeName ? `読込ファイル: ${safeName}` : '';
+  label.title = safeName || '';
+}
+
+/* ファイルからの読込。<input type=file> のダイアログで任意のファイルを選択できる */
+async function importParamsFromFile(file){
+  try{
+    const stored = deserialize(await file.text());
+    applyFormValues(stored.values);
+    calculate();
+    setLoadedParamFileName(file.name);
+    showSaveStatus('ファイルから読み込みました' + formatSavedAt(stored.savedAt));
+  }catch(e){
+    console.warn('ファイルの読み込みに失敗しました:', e);
+    showSaveStatus('ファイルを読み込めませんでした(形式をご確認ください)', 'error');
+  }
+}
+
+document.getElementById('calcBtn').addEventListener('click', calculate);
+document.getElementById('exportSheetsBtn').addEventListener('click', exportAnnualBreakdownToSheets);
+document.getElementById('saveBtn').addEventListener('click', saveParams);
+document.getElementById('loadBtn').addEventListener('click', async () => {
+  const loaded = await loadParams();
+  if(loaded) calculate();
+});
+document.getElementById('resetBtn').addEventListener('click', resetParams);
+document.getElementById('exportFileBtn').addEventListener('click', exportParamsToFile);
+document.getElementById('importFileBtn').addEventListener('click', () => {
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = ''; // 同じファイルを連続して選択してもchangeイベントが発火するようにリセット
+  if(file) await importParamsFromFile(file);
+});
+
+/* ================= 税率モーダルの開閉 ================= */
+const rateModalBackdrop = document.getElementById('rateModalBackdrop');
+function openRateModal(){
+  document.getElementById('rateModalBody').innerHTML = buildRateModalHTML();
+  rateModalBackdrop.classList.add('show');
+}
+function closeRateModal(){
+  rateModalBackdrop.classList.remove('show');
+}
+document.getElementById('rateBtn').addEventListener('click', openRateModal);
+document.getElementById('rateModalClose').addEventListener('click', closeRateModal);
+rateModalBackdrop.addEventListener('click', (e) => {
+  if(e.target === rateModalBackdrop) closeRateModal();
+});
+window.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && rateModalBackdrop.classList.contains('show')) closeRateModal();
+});
+
+/* ================= 年間支出の月次内訳モーダル ================= */
+function updateExpenseCatTotals(){
+  const monthly = EXPENSE_CATEGORY_IDS.reduce((sum, id) => sum + parseAmount(document.getElementById(id).value), 0);
+  document.getElementById('expenseCatMonthlyTotal').textContent = `${yen(monthly)}円`;
+  document.getElementById('expenseCatAnnualTotal').textContent = `${yen(monthly*12)}円`;
+}
+EXPENSE_CATEGORY_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updateExpenseCatTotals);
+});
+
+const expenseModalBackdrop = document.getElementById('expenseModalBackdrop');
+function openExpenseModal(){
+  updateExpenseCatTotals();
+  expenseModalBackdrop.classList.add('show');
+}
+function closeExpenseModal(){
+  expenseModalBackdrop.classList.remove('show');
+}
+document.getElementById('expenseBreakdownBtn').addEventListener('click', openExpenseModal);
+document.getElementById('expenseModalClose').addEventListener('click', closeExpenseModal);
+expenseModalBackdrop.addEventListener('click', (e) => {
+  if(e.target === expenseModalBackdrop) closeExpenseModal();
+});
+window.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && expenseModalBackdrop.classList.contains('show')) closeExpenseModal();
+});
+document.getElementById('expenseApplyBtn').addEventListener('click', () => {
+  const monthly = EXPENSE_CATEGORY_IDS.reduce((sum, id) => sum + parseAmount(document.getElementById(id).value), 0);
+  document.getElementById('annualExpense').value = formatAmountValue(String(Math.round(monthly*12)));
+  closeExpenseModal();
+});
+
+/* ================= PDFレポート出力 ================= */
+// 印刷時はサイドバーが非表示になるため、入力パラメータを左パネルの表示内容から
+// そのまま抽出して、印刷専用のサマリーとして本文側に差し込む(印刷結果だけで
+// 内容が読めるようにするため)
+function buildPrintSummaryHTML(){
+  const groups = new Map(); // グループ見出し -> 項目HTMLの配列
+  [...INPUT_IDS, ...CHECKBOX_IDS].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const spotRow = el.closest('.spot-row');
+    if(spotRow && (spotRow.hidden || !spotRowHasValue(Number(spotRow.dataset.spot)))) return; // 未使用のスポット支出欄は印刷しない
+    const groupEl = el.closest('.group');
+    const groupTitle = groupEl ? groupEl.querySelector('.group-title').textContent.trim() : 'その他';
+
+    let label, value;
+    if(el.type === 'checkbox'){
+      label = el.closest('label.checkline').textContent.trim();
+      value = el.checked ? 'ON' : 'OFF';
+    } else {
+      const labelEl = el.closest('.field').querySelector('label');
+      const unit = labelEl.querySelector('.unit') ? labelEl.querySelector('.unit').textContent : '';
+      label = labelEl.textContent.replace(unit, '').trim();
+      if(el.tagName === 'SELECT'){
+        value = el.options[el.selectedIndex].text;
+      } else {
+        // 金額欄はカンマ区切りで表示しているため、parseFloat ではなく parseAmount で読む
+        const raw = el.value.trim();
+        const num = AMOUNT_INPUT_IDS.includes(id) ? parseAmount(raw) : parseFloat(raw);
+        value = raw !== '' && Number.isFinite(num) ? num.toLocaleString('ja-JP') + unit : (raw || '—');
+      }
+    }
+    if(spotRow) label = `スポット${spotRow.dataset.spot}・${label}`; // 同じラベルが3行ぶん並ぶため区別できるようにする
+    if(!groups.has(groupTitle)) groups.set(groupTitle, []);
+    groups.get(groupTitle).push(`<div class="print-item"><span class="print-label">${escapeHtml(label)}</span><span class="print-value">${escapeHtml(value)}</span></div>`);
+  });
+
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${pad(now.getHours())}:${pad(now.getMinutes())} 生成`;
+
+  const groupsHTML = [...groups.entries()].map(([title, items]) => `
+    <div class="print-summary-group">
+      <h3>${title}</h3>
+      <div class="print-grid">${items.join('')}</div>
+    </div>
+  `).join('');
+
+  return `<h2>入力パラメータ</h2><div class="print-date">${dateStr}</div>${groupsHTML}`;
+}
+window.addEventListener('beforeprint', () => {
+  document.getElementById('printSummary').innerHTML = buildPrintSummaryHTML();
+});
+document.getElementById('pdfBtn').addEventListener('click', () => window.print());
+
+/* ================= ダーク/ライトモード切替 ================= */
+// グラフはSVG属性値に var(--xxx) を直接埋め込んでいるため、CSSのカスタムプロパティが
+// 切り替わるだけで再描画不要ですべての色が追従する
+const THEME_KEY = 'retirement-dashboard-theme';
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeBtn').textContent = theme === 'light' ? 'ダークモード' : 'ライトモード';
+}
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  applyTheme(next);
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+});
+applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+
+window.addEventListener('DOMContentLoaded', async () => {
+  initAmountInputs();
+  captureDefaults();
+  initCollapsibleGroups();
+  initTableTooltip();
+  syncSpotRows();
+  syncNisaOptions();
+  updatePensionAdjustNote();
+  updatePartnerDeathAgeNote();
+  await loadParams({silent:true}); // 起動時は保存データがあれば自動復元(なければ初期値のまま)
+  calculate();
+});
+</script>
+</body>
+</html>

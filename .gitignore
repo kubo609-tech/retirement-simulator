@@ -1,0 +1,30 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets (念のため)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Misc
+*.bak
+*.tmp
