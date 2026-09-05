@@ -37,6 +37,7 @@
   --income-salary:#9B7EF0;
   --income-postret:#FFCB6B;
   --income-dc:#34D399;
+  --income-personal:#FB923C;
   --income-pension:#F2789F;
   --income-kakyu:#5EEAD4;
   --income-pension-partner:#C2455C;
@@ -80,6 +81,7 @@
   --income-salary:#6748C9;
   --income-postret:#8A6100;
   --income-dc:#1C9A66;
+  --income-personal:#C2410C;
   --income-pension:#C93E6C;
   --income-kakyu:#0F9488;
   --income-pension-partner:#8F2A46;
@@ -458,6 +460,7 @@ body{
 .chart-tooltip .tt-salary{color:var(--income-salary);}
 .chart-tooltip .tt-postret{color:var(--income-postret);}
 .chart-tooltip .tt-dc{color:var(--income-dc);}
+.chart-tooltip .tt-personal{color:var(--income-personal);}
 .chart-tooltip .tt-pension{color:var(--income-pension);}
 .chart-tooltip .tt-kakyu{color:var(--income-kakyu);}
 .chart-tooltip .tt-pension-partner{color:var(--income-pension-partner);}
@@ -797,6 +800,15 @@ td[data-col]{cursor:help;}
     </div>
 
     <div class="group">
+      <div class="group-title">個人年金</div>
+      <div class="field"><label>年金総額<span class="unit">円</span></label><input type="text" inputmode="numeric" id="personalPensionTotal" value=""></div>
+      <div class="field-row">
+        <div class="field"><label>受取開始年齢<span class="unit">歳</span></label><input type="number" id="personalPensionStartAge" value="65"></div>
+        <div class="field"><label>受取年数<span class="unit">年</span></label><input type="number" id="personalPensionYears" value="10"></div>
+      </div>
+    </div>
+
+    <div class="group">
       <div class="group-title">公的年金</div>
       <div class="field-row">
         <div class="field"><label>本人の老齢基礎年金<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="primaryBasicPension" value=""></div>
@@ -829,7 +841,7 @@ td[data-col]{cursor:help;}
       <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applyPartnerDeath"> パートナーの死亡年齢を設定する</label>
       <div class="field"><label>パートナーの死亡年齢<span class="unit">歳(パートナー自身の年齢)</span></label><input type="number" id="partnerDeathAge" value="85"></div>
       <div class="table-note" id="partnerDeathAgeNote" style="padding:2px 0 2px;"></div>
-      <div class="table-note" style="padding:4px 0 2px;">死亡した人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)は、その年から0になります。生存側の支出はこれまでと変更しません。本人・パートナーの両方が死亡した年より後は試算を打ち切ります</div>
+      <div class="table-note" style="padding:4px 0 2px;">死亡した人の給与・退職後の少額収入・退職金・DC年金・個人年金・公的年金(加給年金含む)は、その年から0になります。生存側の支出はこれまでと変更しません。本人・パートナーの両方が死亡した年より後は試算を打ち切ります</div>
       <label class="checkline" style="margin-top:9px;"><input type="checkbox" id="applySurvivorPension"> 遺族厚生年金を計算に含める</label>
       <div class="table-note" style="padding:4px 0 2px;">生存側は「自分の老齢基礎年金+老齢厚生年金」を全額受け取ったうえで、死亡した人の老齢厚生年金額の3/4と、(死亡した人の老齢厚生年金額+生存側自身の老齢厚生年金額)の1/2のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を、遺族厚生年金として非課税で上乗せします(死亡した人が「公的年金」欄の受給要件チェックを満たす場合のみ発生)。中高齢寡婦加算・65歳以降の受給調整・遺族基礎年金(子がいる場合)は考慮していません</div>
     </div>
@@ -971,7 +983,7 @@ td[data-col]{cursor:help;}
           <h1 class="page-title">退職後資産シミュレーター</h1>
           <span class="loaded-param-file" id="loadedParamFileName" aria-live="polite"></span>
         </div>
-        <p class="page-sub">給与・退職金・DC年金・公的年金(本人・パートナー)の受取と、税金・支出を考慮した資産(運用+現金)の年次推移</p>
+        <p class="page-sub">給与・退職金・DC年金・個人年金・公的年金(本人・パートナー)の受取と、税金・支出を考慮した資産(運用+現金)の年次推移</p>
       </div>
       <div class="head-actions no-print">
         <button class="pdf-btn" id="themeBtn" type="button">ライトモード</button>
@@ -1016,11 +1028,12 @@ td[data-col]{cursor:help;}
 
     <div class="chart-card">
       <div class="chart-head">
-        <h2>収入内訳(給与 / 少額収入 / DC年金 / 公的年金 / 取り崩し)</h2>
+        <h2>収入内訳(給与 / 少額収入 / DC年金 / 個人年金 / 公的年金 / 取り崩し)</h2>
         <div class="legend">
           <span><span class="swatch" style="background:var(--income-salary)"></span>給与</span>
           <span><span class="swatch" style="background:var(--income-postret)"></span>少額収入</span>
           <span><span class="swatch" style="background:var(--income-dc)"></span>DC年金</span>
+          <span><span class="swatch" style="background:var(--income-personal)"></span>個人年金</span>
           <span><span class="swatch" style="background:var(--income-pension)"></span>公的年金(本人)</span>
           <span><span class="swatch" style="background:var(--income-kakyu)"></span>加給年金</span>
           <span><span class="swatch" style="background:var(--income-pension-partner)"></span>公的年金(パートナー)</span>
@@ -1049,7 +1062,7 @@ td[data-col]{cursor:help;}
         <table>
           <thead>
             <tr>
-              <th>年齢</th><th>給与</th><th>少額収入</th><th>退職金</th><th>DC年金</th><th>公的年金</th>
+              <th>年齢</th><th>給与</th><th>少額収入</th><th>退職金</th><th>DC年金</th><th>個人年金</th><th>公的年金</th>
               <th>支出(内 保険料)</th><th>内 スポット支出</th><th>税金計(内 運用益)</th><th>純CF</th><th>現金残高</th><th>運用残高</th><th>総資産</th>
             </tr>
           </thead>
@@ -1060,7 +1073,7 @@ td[data-col]{cursor:help;}
     </div>
 
     <div class="footnote">
-      <b>試算の前提について:</b> 税額は令和8年(2026年)分の税制を簡易的に適用した概算です(給与所得控除・公的年金等控除・基礎控除・所得税速算表・住民税10%+均等割を使用)。社会保険料控除・医療費控除・配偶者控除は「社会保険料・追加控除」欄で計算に含めるかどうかを選べます(下記参照)。それ以外の控除(扶養控除、iDeCoの掛金控除など)は考慮していません。退職金は分離課税・1/2課税、DC・公的年金は総合課税の雑所得として計算しています。退職後の少額収入は給与所得として、他の給与と合算して給与所得控除・総合課税を適用します(開始年齢〜継続年数の期間のみ加算し、収支は現金保有目標に基づき自動でリバランスされます)。パートナーの年金は本人とは別世帯主体として個別に確定申告する前提で課税額を計算しています(パートナーの年齢は「本人との年齢差」から求めた実年齢を使用。社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用し、パートナー自身の申告には適用していません)。退職一時金は税引後の金額を「受取時の現金配分比率」に従って現金と運用資産へ即時に振り分け、以降の毎年の収支(給与・DC・年金-税金-社会保険料-支出)は現金保有目標(円、固定額・物価上昇による自動調整はなし)に基づき別途自動でリバランスされます。実際の税額・手取りとは差異が生じますので、正式な判断には税理士等にご確認ください。運用資産の利回りは一定率で複利計算しており、市場変動リスクは反映していません。<br><b>グラフの点線(運用元本)について:</b> 運用資産へ投じた累計額(運用益を含まない金額)を、現金残高の上に積んだ位置に表示しています。したがって<b>点線と白い合計ラインの差が、その時点の運用損益(含み益)</b>にあたります。取り崩し時に元本をどう減らすかは左側の「取り崩し時の元本の減らし方」で切り替えられます(比例配分=残高に占める元本と運用益の比率で按分、運用益から先に取り崩す=運用益を使い切ってから元本に手をつける)。<br><b>NISA・運用益課税について:</b> 「NISA枠を優先して埋める」(既定ON)の場合、運用へ回す資金は毎年、NISAの年間投資枠(既定360万円)と生涯投資枠(既定1,800万円)の空きに優先して入り、入りきらない分が特定口座になります(OFFにすると、NISAへは新規に投資せず全額が特定口座になります)。枠はいずれも簿価(取得額)ベースで管理し、NISAを売却した場合はその簿価分の生涯枠が翌年に復活します。取り崩しは特定口座から先に行い、売却益に対して既定20.315%(所得税15.315%+住民税5%)を課税します。源泉徴収と同じく税引後の手取りが必要額になるよう売却額を割り戻しているため、課税口座の含み益が大きいほど多く売却することになります。この運用益課税は年次内訳の「税金計」に<b>内数</b>(カッコ内)として含めています。なお、譲渡損失の繰越控除、配当・分配金への課税、NISAの成長投資枠1,200万円の内枠、金融商品の売却順序の最適化は考慮していません。「NISA年間枠に沿って積立」をONにすると、その年のNISA年間枠に入りきらない投資資金は特定口座へ回さず現金として保有し、翌年以降にNISA年間枠が空き次第優先的に投資します(現金保有目標を上回った状態がしばらく続くことがあります)。ただしNISAの生涯投資枠を使い切った後は、それ以上NISAへ投資する余地がないため、通常どおり特定口座へ投資します。「特定口座からNISAへ毎年移し替える」(既定OFF)をONにすると、新たに投資へ回す資金がない年でも、毎年NISA年間枠の空き分だけ特定口座を売却し、税引後の手取りをそのままNISAで買い直します(いわゆるリレー投資)。退職後で追加の入金がない場合でも生涯投資枠を使い切るまでNISAへ移していけますが、移し替えのための売却でその都度、含み益に対して運用益課税がかかります(その代わり、移し替えた後の値上がり分は非課税になります)。移し替えは現金の増減を伴わないため、投資資産の内訳グラフの「取り崩し」には含めていません(売却で支払った税額は「運用益課税」に含まれます)。<br><b>投資資産の内訳グラフについて:</b> 下3段のNISA枠(元本)・特定口座(元本)・運用益(含み益)で、その年の運用残高(NISA+特定口座の合計)をちょうど分解しています。上2段の取り崩し(売却手取り)と運用益課税は、残高ではなくその年の<b>フロー</b>項目のため、取り崩しがあった年はバーの高さが残高よりその分高くなります。取り崩しの段は<b>その年に運用資産を売却して得た手取り</b>(売却総額-運用益課税)で、これを残高のすぐ上に積んでいるため、<b>その段の下端がその年の運用残高、上端が「取り崩さなければ残っていた額」の目安</b>になります。取り崩し(灰色)+運用益課税(赤)が、その年に運用資産から出ていった額です(通常はその年の売却総額と一致します。NISAへの移し替えを行った年は、移し替えた元本は運用資産の中に残るため灰色には含めず、移し替えで支払った税額だけが赤に含まれます)。なお、収入内訳グラフの「取り崩し」は<b>世帯の収支不足額</b>で、現金から補填した分も含むため、こちらの数字とは一致しません(現金だけで賄えた年はこのグラフの取り崩しは0になります)。含み損(運用益がマイナス)の年は、運用益の棒を0として表示します(実際の値はホバーのツールチップでご確認ください)。<br><b>社会保険料・医療費控除・配偶者控除について:</b> 「社会保険料・追加控除」欄のチェックボックスで、これらをまとめて計算に含めるかどうかを切り替えられます。健康保険・介護保険料等の社会保険料は、現役時代は給与に対する概算料率(既定15%)、退職後(給与終了後)は年額(既定40万円、物価上昇率で調整)で概算し、社会保険料控除として税額を軽減するだけでなく、実際の支出としても収支に反映します(年次内訳の「支出」列に内数で表示)。医療費控除は、入力した年間医療費(本人+パートナー合算を想定)から「10万円と総所得金額の5%の低い方」を差し引いた額(上限200万円)を、本人の総所得金額から控除します。配偶者控除は「配偶者控除の対象となる配偶者がいる」にチェックを入れた場合のみ適用し、パートナーの年金額(既存パラメータ)から配偶者の合計所得金額を自動判定します。配偶者の合計所得金額が48万円を超える場合は控除0とし、より複雑な配偶者特別控除(48万円超133万円以下で段階的に減る控除)は考慮していません。配偶者の年齢は「本人との年齢差」から求めた実年齢を使用します(70歳以上の場合の割増控除額の判定に使用)。社会保険料控除・医療費控除・配偶者控除はいずれも本人の確定申告にのみ適用し、パートナー自身の(別世帯主体としての)申告には適用していません。<br><b>ライフステージ・リスク設定について:</b> 年間支出は「年間支出×(1+支出上昇率)^経過年数×年齢帯別の支出倍率」で算出します(初期値は74歳まで100%、75〜84歳85%、85歳以降90%)。スポット(一時的)支出は最大3件まで登録でき、指定した年齢の年に一度だけ支出へ加算します(「物価上昇率を適用する」をONにした行は、入力額を現在価値とみなして発生年までの上昇分を上乗せします)。運用利回りは「年齢に応じて運用利回りを切り替える」がONの場合、65歳まで・66〜75歳・76歳以降の3段階(初期値3.5%/2.5%/1.5%)を年齢に応じて適用し、OFFの場合は「資産・運用」欄の運用利回りを全年齢に一律適用します。いずれも年齢による決め打ちの想定であり、実際の支出の推移や市場の変動を予測するものではありません。<br><b>公的年金の繰上げ・繰下げについて:</b> 「繰上げ・繰下げ受給による年額の増減を自動調整する」がONの場合、入力した年額を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます(繰上げ=1ヶ月あたり-0.4%・最大-24%、繰下げ=1ヶ月あたり+0.7%・最大+84%)。パートナーの年金にも同じ率を適用し、こちらはパートナー自身の受給開始年齢で判定します(受給が始まるのが本人の何歳のときかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は制度の上下限に丸めて計算します。在職老齢年金による支給停止は考慮していません。<br><b>加給年金について:</b> 「加給年金を追加する」(既定OFF)をONにすると、本人の厚生年金加入期間が20年以上ある(「受給要件」チェックボックスで指定)前提で、本人が65歳に達して年金を受給中(繰上げ受給を選んでいても加給年金自体は65歳より前には始まらず、繰下げ待機中も年金と同様に不支給です)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額(年額、既定40万8,100円・概算)を上乗せします。パートナーが65歳になった時点で打ち切られ、配偶者の年金に付く「振替加算」は考慮していません。子の加算、配偶者自身の所得や厚生年金加入期間による支給停止にも対応していません。<br><b>死亡・遺族厚生年金について:</b> 「本人の死亡年齢を設定する」「パートナーの死亡年齢を設定する」(既定OFF)をそれぞれONにすると、指定した年齢に達した年から、その人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)をすべて0として扱います(死亡年齢そのものの年も含む)。「遺族厚生年金を計算に含める」をONにすると、死亡した人について入力した老齢厚生年金相当額(報酬比例部分。基礎年金分は含めない)の3/4を、生存側に非課税(所得税・住民税とも課税対象外)で毎年上乗せします。中高齢寡婦加算(現行制度では40〜64歳の妻のみが対象で、このアプリは性別を管理していないため非対応)、65歳以降に生存側自身の老齢厚生年金と遺族厚生年金を調整する仕組み、遺族基礎年金(子のある配偶者・子のみが対象で、このアプリは子を考慮していないため非対応)、支給要件(保険料納付済期間など)の判定は考慮していません。配偶者控除は、パートナーが死亡した年より後は適用しません。生存側の生活費(支出)は死亡前と変更せず試算します。本人・パートナーの両方が死亡した年より後は、年次内訳・グラフともに行を生成せず試算を打ち切ります。<br><b>収入内訳グラフについて:</b> 給与・DC年金・公的年金は税引前(額面)の金額を表示しています。公的年金は<b>本人・パートナーを別の色(赤系統の濃淡)</b>で分けて積み上げています。「取り崩し」は、税引後の収入(給与等-税金-社会保険料)だけではその年の支出を賄えなかった不足分で、<b>投資資産の内訳グラフの取り崩し(売却手取り)と同じ薄い灰色</b>で表示しています(ただしこちらは現金からの補填も含む世帯ベースの不足額のため、投資資産の内訳グラフの数字とは一致しません)。赤字の年は、棒の合計(税引前収入+取り崩し)は「年間支出(生活費)」の線ではなく、生活費に社会保険料・税金を加えた「支出+保険料+税金(実質支出)」の線と一致します。2本の線の間隔が、その年の社会保険料+税額に相当します。
+      <b>試算の前提について:</b> 税額は令和8年(2026年)分の税制を簡易的に適用した概算です(給与所得控除・公的年金等控除・基礎控除・所得税速算表・住民税10%+均等割を使用)。社会保険料控除・医療費控除・配偶者控除は「社会保険料・追加控除」欄で計算に含めるかどうかを選べます(下記参照)。それ以外の控除(扶養控除、iDeCoの掛金控除など)は考慮していません。退職金は分離課税・1/2課税、DC・個人年金・公的年金は総合課税の雑所得として計算しています(個人年金もDCと同様、簡易的に公的年金等控除の対象として計算しています)。退職後の少額収入は給与所得として、他の給与と合算して給与所得控除・総合課税を適用します(開始年齢〜継続年数の期間のみ加算し、収支は現金保有目標に基づき自動でリバランスされます)。パートナーの年金は本人とは別世帯主体として個別に確定申告する前提で課税額を計算しています(パートナーの年齢は「本人との年齢差」から求めた実年齢を使用。社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用し、パートナー自身の申告には適用していません)。退職一時金は税引後の金額を「受取時の現金配分比率」に従って現金と運用資産へ即時に振り分け、以降の毎年の収支(給与・DC・個人年金・年金-税金-社会保険料-支出)は現金保有目標(円、固定額・物価上昇による自動調整はなし)に基づき別途自動でリバランスされます。実際の税額・手取りとは差異が生じますので、正式な判断には税理士等にご確認ください。運用資産の利回りは一定率で複利計算しており、市場変動リスクは反映していません。<br><b>グラフの点線(運用元本)について:</b> 運用資産へ投じた累計額(運用益を含まない金額)を、現金残高の上に積んだ位置に表示しています。したがって<b>点線と白い合計ラインの差が、その時点の運用損益(含み益)</b>にあたります。取り崩し時に元本をどう減らすかは左側の「取り崩し時の元本の減らし方」で切り替えられます(比例配分=残高に占める元本と運用益の比率で按分、運用益から先に取り崩す=運用益を使い切ってから元本に手をつける)。<br><b>NISA・運用益課税について:</b> 「NISA枠を優先して埋める」(既定ON)の場合、運用へ回す資金は毎年、NISAの年間投資枠(既定360万円)と生涯投資枠(既定1,800万円)の空きに優先して入り、入りきらない分が特定口座になります(OFFにすると、NISAへは新規に投資せず全額が特定口座になります)。枠はいずれも簿価(取得額)ベースで管理し、NISAを売却した場合はその簿価分の生涯枠が翌年に復活します。取り崩しは特定口座から先に行い、売却益に対して既定20.315%(所得税15.315%+住民税5%)を課税します。源泉徴収と同じく税引後の手取りが必要額になるよう売却額を割り戻しているため、課税口座の含み益が大きいほど多く売却することになります。この運用益課税は年次内訳の「税金計」に<b>内数</b>(カッコ内)として含めています。なお、譲渡損失の繰越控除、配当・分配金への課税、NISAの成長投資枠1,200万円の内枠、金融商品の売却順序の最適化は考慮していません。「NISA年間枠に沿って積立」をONにすると、その年のNISA年間枠に入りきらない投資資金は特定口座へ回さず現金として保有し、翌年以降にNISA年間枠が空き次第優先的に投資します(現金保有目標を上回った状態がしばらく続くことがあります)。ただしNISAの生涯投資枠を使い切った後は、それ以上NISAへ投資する余地がないため、通常どおり特定口座へ投資します。「特定口座からNISAへ毎年移し替える」(既定OFF)をONにすると、新たに投資へ回す資金がない年でも、毎年NISA年間枠の空き分だけ特定口座を売却し、税引後の手取りをそのままNISAで買い直します(いわゆるリレー投資)。退職後で追加の入金がない場合でも生涯投資枠を使い切るまでNISAへ移していけますが、移し替えのための売却でその都度、含み益に対して運用益課税がかかります(その代わり、移し替えた後の値上がり分は非課税になります)。移し替えは現金の増減を伴わないため、投資資産の内訳グラフの「取り崩し」には含めていません(売却で支払った税額は「運用益課税」に含まれます)。<br><b>投資資産の内訳グラフについて:</b> 下3段のNISA枠(元本)・特定口座(元本)・運用益(含み益)で、その年の運用残高(NISA+特定口座の合計)をちょうど分解しています。上2段の取り崩し(売却手取り)と運用益課税は、残高ではなくその年の<b>フロー</b>項目のため、取り崩しがあった年はバーの高さが残高よりその分高くなります。取り崩しの段は<b>その年に運用資産を売却して得た手取り</b>(売却総額-運用益課税)で、これを残高のすぐ上に積んでいるため、<b>その段の下端がその年の運用残高、上端が「取り崩さなければ残っていた額」の目安</b>になります。取り崩し(灰色)+運用益課税(赤)が、その年に運用資産から出ていった額です(通常はその年の売却総額と一致します。NISAへの移し替えを行った年は、移し替えた元本は運用資産の中に残るため灰色には含めず、移し替えで支払った税額だけが赤に含まれます)。なお、収入内訳グラフの「取り崩し」は<b>世帯の収支不足額</b>で、現金から補填した分も含むため、こちらの数字とは一致しません(現金だけで賄えた年はこのグラフの取り崩しは0になります)。含み損(運用益がマイナス)の年は、運用益の棒を0として表示します(実際の値はホバーのツールチップでご確認ください)。<br><b>社会保険料・医療費控除・配偶者控除について:</b> 「社会保険料・追加控除」欄のチェックボックスで、これらをまとめて計算に含めるかどうかを切り替えられます。健康保険・介護保険料等の社会保険料は、現役時代は給与に対する概算料率(既定15%)、退職後(給与終了後)は年額(既定40万円、物価上昇率で調整)で概算し、社会保険料控除として税額を軽減するだけでなく、実際の支出としても収支に反映します(年次内訳の「支出」列に内数で表示)。医療費控除は、入力した年間医療費(本人+パートナー合算を想定)から「10万円と総所得金額の5%の低い方」を差し引いた額(上限200万円)を、本人の総所得金額から控除します。配偶者控除は「配偶者控除の対象となる配偶者がいる」にチェックを入れた場合のみ適用し、パートナーの年金額(既存パラメータ)から配偶者の合計所得金額を自動判定します。配偶者の合計所得金額が48万円を超える場合は控除0とし、より複雑な配偶者特別控除(48万円超133万円以下で段階的に減る控除)は考慮していません。配偶者の年齢は「本人との年齢差」から求めた実年齢を使用します(70歳以上の場合の割増控除額の判定に使用)。社会保険料控除・医療費控除・配偶者控除はいずれも本人の確定申告にのみ適用し、パートナー自身の(別世帯主体としての)申告には適用していません。<br><b>ライフステージ・リスク設定について:</b> 年間支出は「年間支出×(1+支出上昇率)^経過年数×年齢帯別の支出倍率」で算出します(初期値は74歳まで100%、75〜84歳85%、85歳以降90%)。スポット(一時的)支出は最大3件まで登録でき、指定した年齢の年に一度だけ支出へ加算します(「物価上昇率を適用する」をONにした行は、入力額を現在価値とみなして発生年までの上昇分を上乗せします)。運用利回りは「年齢に応じて運用利回りを切り替える」がONの場合、65歳まで・66〜75歳・76歳以降の3段階(初期値3.5%/2.5%/1.5%)を年齢に応じて適用し、OFFの場合は「資産・運用」欄の運用利回りを全年齢に一律適用します。いずれも年齢による決め打ちの想定であり、実際の支出の推移や市場の変動を予測するものではありません。<br><b>公的年金の繰上げ・繰下げについて:</b> 「繰上げ・繰下げ受給による年額の増減を自動調整する」がONの場合、入力した年額を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます(繰上げ=1ヶ月あたり-0.4%・最大-24%、繰下げ=1ヶ月あたり+0.7%・最大+84%)。パートナーの年金にも同じ率を適用し、こちらはパートナー自身の受給開始年齢で判定します(受給が始まるのが本人の何歳のときかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は制度の上下限に丸めて計算します。在職老齢年金による支給停止は考慮していません。<br><b>加給年金について:</b> 「加給年金を追加する」(既定OFF)をONにすると、本人の厚生年金加入期間が20年以上ある(「受給要件」チェックボックスで指定)前提で、本人が65歳に達して年金を受給中(繰上げ受給を選んでいても加給年金自体は65歳より前には始まらず、繰下げ待機中も年金と同様に不支給です)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額(年額、既定40万8,100円・概算)を上乗せします。パートナーが65歳になった時点で打ち切られ、配偶者の年金に付く「振替加算」は考慮していません。子の加算、配偶者自身の所得や厚生年金加入期間による支給停止にも対応していません。<br><b>死亡・遺族厚生年金について:</b> 「本人の死亡年齢を設定する」「パートナーの死亡年齢を設定する」(既定OFF)をそれぞれONにすると、指定した年齢に達した年から、その人の給与・退職後の少額収入・退職金・DC年金・個人年金・公的年金(加給年金含む)をすべて0として扱います(死亡年齢そのものの年も含む)。「遺族厚生年金を計算に含める」をONにすると、死亡した人について入力した老齢厚生年金相当額(報酬比例部分。基礎年金分は含めない)の3/4を、生存側に非課税(所得税・住民税とも課税対象外)で毎年上乗せします。中高齢寡婦加算(現行制度では40〜64歳の妻のみが対象で、このアプリは性別を管理していないため非対応)、65歳以降に生存側自身の老齢厚生年金と遺族厚生年金を調整する仕組み、遺族基礎年金(子のある配偶者・子のみが対象で、このアプリは子を考慮していないため非対応)、支給要件(保険料納付済期間など)の判定は考慮していません。配偶者控除は、パートナーが死亡した年より後は適用しません。生存側の生活費(支出)は死亡前と変更せず試算します。本人・パートナーの両方が死亡した年より後は、年次内訳・グラフともに行を生成せず試算を打ち切ります。<br><b>収入内訳グラフについて:</b> 給与・DC年金・個人年金・公的年金は税引前(額面)の金額を表示しています。公的年金は<b>本人・パートナーを別の色(赤系統の濃淡)</b>で分けて積み上げています。「取り崩し」は、税引後の収入(給与等-税金-社会保険料)だけではその年の支出を賄えなかった不足分で、<b>投資資産の内訳グラフの取り崩し(売却手取り)と同じ薄い灰色</b>で表示しています(ただしこちらは現金からの補填も含む世帯ベースの不足額のため、投資資産の内訳グラフの数字とは一致しません)。赤字の年は、棒の合計(税引前収入+取り崩し)は「年間支出(生活費)」の線ではなく、生活費に社会保険料・税金を加えた「支出+保険料+税金(実質支出)」の線と一致します。2本の線の間隔が、その年の社会保険料+税額に相当します。
     </div>
   </main>
 </div>
@@ -1121,7 +1134,7 @@ td[data-col]{cursor:help;}
 <script>
 /* ================= 金額入力欄のカンマ区切り表示 ================= */
 const AMOUNT_INPUT_IDS = [
-  'salaryPhase1','salaryPhase2','postRetIncome','lumpSum','dcTotal','kakyuNenkinAmount',
+  'salaryPhase1','salaryPhase2','postRetIncome','lumpSum','dcTotal','personalPensionTotal','kakyuNenkinAmount',
   'primaryBasicPension','primaryKouseiPension','partnerBasicPension','partnerKouseiPension',
   'annualExpense','retiredInsuranceAnnual','medicalExpenseAnnual','investStart','cashStart',
   'cashTargetAmount','nisaAnnualLimit','nisaLifetimeLimit','nisaStart',
@@ -1296,7 +1309,7 @@ function buildRateModalHTML(){
 
   return `
     <div class="rate-section">
-      <h3>所得税 速算表(給与・DC年金・公的年金などの総合課税分、退職金の分離課税分に共通)</h3>
+      <h3>所得税 速算表(給与・DC年金・個人年金・公的年金などの総合課税分、退職金の分離課税分に共通)</h3>
       <table class="rate-table">
         <thead><tr><th>課税所得金額</th><th>税率</th><th>控除額</th></tr></thead>
         <tbody>${buildIncomeTaxTableRows()}</tbody>
@@ -1319,7 +1332,7 @@ function buildRateModalHTML(){
     </div>
 
     <div class="rate-section">
-      <h3>公的年金等控除(簡易モデル。DC年金の受取分も同じ控除を適用)</h3>
+      <h3>公的年金等控除(簡易モデル。DC年金・個人年金の受取分も同じ控除を適用)</h3>
       <p>65歳以上</p>
       <table class="rate-table">
         <thead><tr><th>公的年金等の収入金額</th><th>控除額</th></tr></thead>
@@ -1416,7 +1429,7 @@ function buildRateModalHTML(){
         パートナーの死亡年齢: ${partnerDeathOn ? `${partnerDeathAgeVal}歳で設定` : '設定なし(試算期間中は生存)'}<br>
         遺族厚生年金: ${survivorOn ? `適用中(本人の老齢厚生年金 ${primaryKousei}円・受給要件${primarySurvivorOk?'あり':'なし'} / パートナー ${partnerKousei}円・受給要件${partnerSurvivorOk?'あり':'なし'})` : '現在OFF(遺族厚生年金は加算されません)'}
       </div>
-      <p>一方が死亡すると、その人の給与・退職後の少額収入・退職金・DC年金・公的年金(加給年金含む)はその年から0になります。遺族厚生年金をONにすると、生存側は自分の老齢基礎年金・老齢厚生年金を全額受け取ったうえで、「死亡した人の老齢厚生年金額の3/4」と「(死亡した人+生存側自身の老齢厚生年金額の合計)の1/2」のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を遺族厚生年金として非課税で上乗せします(死亡した人が受給要件チェックを満たす場合のみ)。中高齢寡婦加算(現行制度では妻のみ対象)、65歳以降の受給調整、遺族基礎年金(子がいる場合)は考慮していません。生存側の生活費は死亡前と変更せず試算し、本人・パートナーの両方が死亡した年より後は試算を打ち切ります。</p>
+      <p>一方が死亡すると、その人の給与・退職後の少額収入・退職金・DC年金・個人年金・公的年金(加給年金含む)はその年から0になります。遺族厚生年金をONにすると、生存側は自分の老齢基礎年金・老齢厚生年金を全額受け取ったうえで、「死亡した人の老齢厚生年金額の3/4」と「(死亡した人+生存側自身の老齢厚生年金額の合計)の1/2」のいずれか高い方から、生存側自身の老齢厚生年金額を差し引いた差額を遺族厚生年金として非課税で上乗せします(死亡した人が受給要件チェックを満たす場合のみ)。中高齢寡婦加算(現行制度では妻のみ対象)、65歳以降の受給調整、遺族基礎年金(子がいる場合)は考慮していません。生存側の生活費は死亡前と変更せず試算し、本人・パートナーの両方が死亡した年より後は試算を打ち切ります。</p>
     </div>
 
     <div class="rate-section">
@@ -1507,6 +1520,9 @@ function readParams(){
     dcTotal: v('dcTotal'),
     dcStartAge: v('dcStartAge'),
     dcYears: Math.max(v('dcYears'),1),
+    personalPensionTotal: v('personalPensionTotal'),
+    personalPensionStartAge: v('personalPensionStartAge'),
+    personalPensionYears: Math.max(v('personalPensionYears'),1),
     primaryBasicPension: Math.max(v('primaryBasicPension'), 0),
     primaryKouseiPension: Math.max(v('primaryKouseiPension'), 0),
     pensionStartAge: v('pensionStartAge'),
@@ -1569,7 +1585,7 @@ function runSimulation(p){
 
   let cumulativeTax = 0;
   let cumulativeGainsTax = 0;
-  let cumulativeIncome = 0; // 生涯収入(税引前。給与・少額収入・退職金・DC年金・公的年金・パートナー年金・遺族厚生年金の合計)
+  let cumulativeIncome = 0; // 生涯収入(税引前。給与・少額収入・退職金・DC年金・個人年金・公的年金・パートナー年金・遺族厚生年金の合計)
   let cumulativeExpense = 0; // 生涯支出総額(生活費+保険料、各年の物価上昇後の名目額を合計)
   let cumulativeRealizedGain = 0; // 取り崩し時に確定した運用損益の累計(税引前)
   let peak = cash + investBal();
@@ -1692,6 +1708,7 @@ function runSimulation(p){
     const postRetIncome = primaryAlive && (age >= p.postRetIncomeStartAge && age < p.postRetIncomeStartAge + p.postRetIncomeYears) ? p.postRetIncome : 0;
     const lump = primaryAlive && (age === p.lumpSumAge) ? p.lumpSum : 0;
     const dc = primaryAlive && (age >= p.dcStartAge && age < p.dcStartAge + p.dcYears) ? (p.dcTotal / p.dcYears) : 0;
+    const personalPension = primaryAlive && (age >= p.personalPensionStartAge && age < p.personalPensionStartAge + p.personalPensionYears) ? (p.personalPensionTotal / p.personalPensionYears) : 0;
     // 老齢基礎年金・老齢厚生年金は、生死にかかわらず「受給開始年齢に達していれば本来受け取れる額」を別途保持する
     // (rawの厚生年金額は、本人が死亡した年でも遺族厚生年金の算定に使うため)
     const primaryBasicRaw = (age >= p.pensionStartAge) ? primaryBasicAnnual : 0;
@@ -1721,7 +1738,7 @@ function runSimulation(p){
         survivorPension = Math.max(formula - primaryKouseiRaw, 0);
       }
     }
-    const pensionTotal = dc + pension; // 本人の公的年金等控除の対象(DC+本人の公的年金)。パートナー分・遺族厚生年金は含めない
+    const pensionTotal = dc + personalPension + pension; // 本人の公的年金等控除の対象(DC+個人年金+本人の公的年金)。パートナー分・遺族厚生年金は含めない
 
     const yearsElapsed = age - p.currentAge;
     const inflationFactor = Math.pow(1 + p.inflationRate/100, yearsElapsed);
@@ -1769,8 +1786,8 @@ function runSimulation(p){
         lumpTaxable = rtax.taxable;
       }
     }
-    // 通常の収支(給与・退職後少額収入・DC・年金・パートナー年金・遺族厚生年金(非課税) - 税金 - 社会保険料 - 支出)。退職一時金は含めない。
-    const otherNetIncome = salary + postRetIncome + dc + pension + partnerPension + survivorPension - otherTax - partnerTax - insurancePremium;
+    // 通常の収支(給与・退職後少額収入・DC・個人年金・年金・パートナー年金・遺族厚生年金(非課税) - 税金 - 社会保険料 - 支出)。退職一時金は含めない。
+    const otherNetIncome = salary + postRetIncome + dc + personalPension + pension + partnerPension + survivorPension - otherTax - partnerTax - insurancePremium;
     const netCashFlow = otherNetIncome - expense;
 
     if(drawdownAge===null && netCashFlow<0 && age>=p.retirementAge) drawdownAge = age;
@@ -1827,7 +1844,7 @@ function runSimulation(p){
     const totalTax = otherTax + partnerTax + lumpTax + gainsTaxThisYear;
     cumulativeTax += totalTax;
     cumulativeGainsTax += gainsTaxThisYear;
-    cumulativeIncome += salary + postRetIncome + lump + dc + pension + partnerPension + survivorPension;
+    cumulativeIncome += salary + postRetIncome + lump + dc + personalPension + pension + partnerPension + survivorPension;
     cumulativeExpense += expense + insurancePremium;
 
     const invest = investBal();
@@ -1839,7 +1856,7 @@ function runSimulation(p){
     // 取り崩し額 = その年の収入(税引後)だけでは支出を賄えなかった不足分。現金・運用資産から補われる
     const drawdown = Math.max(0, -netCashFlow);
 
-    rows.push({age, year:p.currentYear+yearsElapsed, salary, postRetIncome, lump, dc, pension, kakyuNenkin, partnerPension, survivorPension, primaryAlive, partnerAlive, partnerAge, expense,
+    rows.push({age, year:p.currentYear+yearsElapsed, salary, postRetIncome, lump, dc, personalPension, pension, kakyuNenkin, partnerPension, survivorPension, primaryAlive, partnerAlive, partnerAge, expense,
       baseExpense, spotExpense, spotLabel, expenseRatio, returnRate,
       insurancePremium, totalTax, otherTax, partnerTax, lumpTax, lumpDeduction, lumpTaxable,
       gainsTax: gainsTaxThisYear, gainsTaxRatePct: p.applyGainsTax ? p.gainsTaxRate : 0,
@@ -2076,7 +2093,7 @@ function renderChart(result){
   });
 }
 
-/* 収入(給与/DC年金/公的年金/取り崩し)の積み上げ棒グラフ+年間支出の折れ線。各年の実額は
+/* 収入(給与/DC年金/個人年金/公的年金/取り崩し)の積み上げ棒グラフ+年間支出の折れ線。各年の実額は
    年齢間で連続変化しないため(給与は退職で急に0になる等)、収入側は面/線グラフではなく棒グラフで
    表現する。取り崩し額 = その年の税引後収入だけでは支出を賄えず、資産(現金・運用)から補った金額 */
 function renderIncomeChart(result){
@@ -2086,7 +2103,7 @@ function renderIncomeChart(result){
   const ages = rows.map(r=>r.age);
   const minAge = ages[0], maxAge = ages[ages.length-1];
   const pensionOf = r => r.pension + r.partnerPension + r.survivorPension; // テーブルの「公的年金」列と同じく本人+パートナー+遺族厚生年金の合算(ツールチップの合計表示用)
-  const barTotalOf = r => r.salary + r.postRetIncome + r.dc + pensionOf(r) + r.drawdown;
+  const barTotalOf = r => r.salary + r.postRetIncome + r.dc + r.personalPension + pensionOf(r) + r.drawdown;
   const totalExpenseOf = r => r.expense + r.insurancePremium + r.totalTax; // 生活費+保険料+税金=その年の実質的な支出総額
 
   let maxVal = Math.max(0, ...rows.map(barTotalOf), ...rows.map(totalExpenseOf));
@@ -2112,11 +2129,11 @@ function renderIncomeChart(result){
   if(xTicks[xTicks.length-1] !== maxAge) xTicks.push(maxAge);
 
   // 公的年金は本人(加給年金は別セグメント)/パートナーで色分けし、取り崩しは投資資産の内訳グラフと同じ色にする
-  const SEGMENT_COLORS = ['var(--income-salary)', 'var(--income-postret)', 'var(--income-dc)', 'var(--income-pension)', 'var(--income-kakyu)', 'var(--income-pension-partner)', 'var(--income-survivor)', 'var(--invest-drawdown)'];
+  const SEGMENT_COLORS = ['var(--income-salary)', 'var(--income-postret)', 'var(--income-dc)', 'var(--income-personal)', 'var(--income-pension)', 'var(--income-kakyu)', 'var(--income-pension-partner)', 'var(--income-survivor)', 'var(--invest-drawdown)'];
   const bars = rows.map(r => {
     const x = xScale(r.age) - barW/2;
     let base = 0, rects = '';
-    [r.salary, r.postRetIncome, r.dc, r.pension - r.kakyuNenkin, r.kakyuNenkin, r.partnerPension, r.survivorPension, r.drawdown].forEach((v, i) => {
+    [r.salary, r.postRetIncome, r.dc, r.personalPension, r.pension - r.kakyuNenkin, r.kakyuNenkin, r.partnerPension, r.survivorPension, r.drawdown].forEach((v, i) => {
       if(v > 0){
         const y = yScale(base + v);
         const h = yScale(base) - y;
@@ -2184,6 +2201,7 @@ function renderIncomeChart(result){
       <div class="tt-salary">給与: ${yen(r.salary)}円</div>
       ${r.postRetIncome>0 ? `<div class="tt-postret">少額収入: ${yen(r.postRetIncome)}円</div>` : ''}
       <div class="tt-dc">DC年金: ${yen(r.dc)}円</div>
+      ${r.personalPension>0 ? `<div class="tt-personal">個人年金: ${yen(r.personalPension)}円</div>` : ''}
       <div class="tt-pension">公的年金(本人): ${yen(r.pension)}円</div>
       ${r.kakyuNenkin>0 ? `<div class="tt-kakyu">└ 内 加給年金: ${yen(r.kakyuNenkin)}円</div>` : ''}
       ${r.partnerPension>0 ? `<div class="tt-pension-partner">公的年金(パートナー${r.partnerAge}歳): ${yen(r.partnerPension)}円</div>` : ''}
@@ -2352,6 +2370,7 @@ function renderTable(result){
       <td>${r.postRetIncome? yen(r.postRetIncome):'—'}</td>
       <td data-col="lump">${r.lump? yen(r.lump):'—'}</td>
       <td>${r.dc? yen(r.dc):'—'}</td>
+      <td>${r.personalPension? yen(r.personalPension):'—'}</td>
       <td data-col="pension">${(r.pension+r.partnerPension+r.survivorPension)? yen(r.pension+r.partnerPension+r.survivorPension):'—'}</td>
       <td data-col="expense">${yen(r.expense+r.insurancePremium)} <span class="tax-sub">(${r.insurancePremium>0.5? yen(r.insurancePremium) : '—'})</span></td>
       <td>${r.spotExpense>0.5 ? yen(r.spotExpense) : '—'}${r.spotLabel? ` <span class="tax-sub">(${escapeHtml(r.spotLabel)})</span>` : ''}</td>
@@ -2400,14 +2419,14 @@ function buildTableTipHTML(col, r){
     case 'tax': {
       if(r.totalTax <= 0.5 && r.gainsTax <= 0.5) return '';
       const parts = [];
-      if(r.otherTax > 0.5) parts.push(`<div>給与・少額収入・DC・公的年金分: ${y(r.otherTax)}(実効税率 ${pct(r.otherTax, r.salary+r.postRetIncome+r.dc+r.pension)})</div>`);
+      if(r.otherTax > 0.5) parts.push(`<div>給与・少額収入・DC・個人年金・公的年金分: ${y(r.otherTax)}(実効税率 ${pct(r.otherTax, r.salary+r.postRetIncome+r.dc+r.personalPension+r.pension)})</div>`);
       if(r.partnerTax > 0.5) parts.push(`<div>パートナー年金分: ${y(r.partnerTax)}(実効税率 ${pct(r.partnerTax, r.partnerPension)})</div>`);
       if(r.lumpTax > 0.5) parts.push(`<div>退職金分: ${y(r.lumpTax)}(実効税率 ${pct(r.lumpTax, r.lump)})</div>`);
       if(r.gainsTax > 0.5) parts.push(`<div class="tt-invtax">運用益課税: ${y(r.gainsTax)}(税率 ${r.gainsTaxRatePct.toFixed(3)}%)</div>`);
       return `<div class="tt-age">税金の内訳</div>${parts.join('')}<div class="tt-total">合計: ${y(r.totalTax)}</div>`;
     }
     case 'netcf': {
-      const income = r.salary + r.postRetIncome + r.dc + r.pension + r.partnerPension;
+      const income = r.salary + r.postRetIncome + r.dc + r.personalPension + r.pension + r.partnerPension;
       const nonGainsTax = r.otherTax + r.partnerTax; // 純CFには運用益課税(売却時源泉)は含まない
       return `<div class="tt-age">純CFの内訳</div>
         <div class="tt-salary">収入計: ${y(income)}</div>
@@ -2489,14 +2508,14 @@ function initTableTooltip(){
    持たせずに済む。Google Sheets側でA1に貼り付けると列として展開される。 */
 function buildAnnualBreakdownTSV(result){
   const headers = [
-    '年齢', '給与', '少額収入', '退職金', 'DC年金', '公的年金', '内 加給年金', '内 遺族厚生年金',
+    '年齢', '給与', '少額収入', '退職金', 'DC年金', '個人年金', '公的年金', '内 加給年金', '内 遺族厚生年金',
     '支出', '内 保険料', '内 スポット支出', 'スポット支出名',
     '税金計', '内 運用益課税', '純CF', '現金残高', '運用残高', '総資産'
   ];
   const amount = value => String(Math.round(value || 0));
   const cleanText = value => String(value || '').replace(/[\t\r\n]/g, ' ');
   const rows = result.rows.map(r => [
-    r.age, amount(r.salary), amount(r.postRetIncome), amount(r.lump), amount(r.dc), amount(r.pension + r.partnerPension + r.survivorPension), amount(r.kakyuNenkin), amount(r.survivorPension),
+    r.age, amount(r.salary), amount(r.postRetIncome), amount(r.lump), amount(r.dc), amount(r.personalPension), amount(r.pension + r.partnerPension + r.survivorPension), amount(r.kakyuNenkin), amount(r.survivorPension),
     amount(r.expense + r.insurancePremium), amount(r.insurancePremium), amount(r.spotExpense), cleanText(r.spotLabel),
     amount(r.totalTax), amount(r.gainsTax), amount(r.netCashFlow), amount(r.cash), amount(r.invest), amount(r.total),
   ]);
@@ -2751,6 +2770,7 @@ const INPUT_IDS = [
   'postRetIncome','postRetIncomeStartAge','postRetIncomeYears',
   'lumpSum','lumpSumAge','serviceYears','lumpSumCashRatio',
   'dcTotal','dcStartAge','dcYears',
+  'personalPensionTotal','personalPensionStartAge','personalPensionYears',
   'primaryBasicPension','primaryKouseiPension','pensionStartAge',
   'partnerBasicPension','partnerKouseiPension','partnerAgeDiff','partnerPensionStartAge','kakyuNenkinAmount',
   'primaryDeathAge','partnerDeathAge',
