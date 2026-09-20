@@ -381,7 +381,7 @@ body{
   transition:border-color .15s, color .15s;
 }
 .pdf-btn:hover{border-color:var(--accent-invest);color:var(--text-1);}
-.head-actions{display:flex;gap:8px;flex-shrink:0;}
+.head-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;max-width:100%;}
 
 .print-only{display:none;}
 
@@ -993,6 +993,7 @@ td[data-col]{cursor:help;}
       </div>
       <div class="head-actions no-print">
         <button class="pdf-btn" id="themeBtn" type="button">ライトモード</button>
+        <button class="pdf-btn" id="excelBtn" type="button">Excelダウンロード</button>
         <button class="pdf-btn" id="pdfBtn" type="button">PDFレポート出力</button>
       </div>
     </div>
@@ -2339,29 +2340,41 @@ function renderInvestChart(result){
   });
 }
 
-function renderStats(result, p){
+/* サマリーカードの中身。画面(renderStats)とExcel出力で同じものを使う。
+   kind: 'man'=万円表示(raw は円) / 'age'=歳表示 / 'none'=値なし(—) */
+function buildStatCards(result, p){
   const last = result.rows[result.rows.length-1];
-  const el = document.getElementById('statRow');
+  const man = (label, raw, accent, warn) => ({label, kind:'man', raw, accent, warn:!!warn});
   const cards = [
-    {label:`${last.age}歳時点の総資産`, value: manyen(last.total)+'<small>万円</small>', accent:'var(--accent-invest)', warn: last.total<0},
-    {label:'資産ピーク額', value: manyen(result.peak)+'<small>万円</small>', accent:'var(--accent-good)'},
-    {label:'取り崩し開始年齢', value: (result.drawdownAge!=null? result.drawdownAge+'<small>歳</small>' : '—'), accent:'var(--accent-cash)'},
-    {label:'生涯収入(税引前)', value: manyen(result.cumulativeIncome)+'<small>万円</small>', accent:'var(--accent-good)'},
-    {label:'生涯支出総額(インフレ加味後)', value: manyen(result.cumulativeExpense)+'<small>万円</small>', accent:'var(--accent-cash)'},
-    {label:'生涯納税額(概算)', value: manyen(result.cumulativeTax)+'<small>万円</small>', accent:'var(--accent-invest)'},
-    {label:'内 運用益課税(概算)', value: manyen(result.cumulativeGainsTax)+'<small>万円</small>', accent:'var(--accent-principal)'},
-    {label:'運用益累計(税引前)', value: manyen(result.cumulativeGain)+'<small>万円</small>', accent:'var(--accent-good)', warn: result.cumulativeGain<0},
+    man(`${last.age}歳時点の総資産`, last.total, 'var(--accent-invest)', last.total<0),
+    man('資産ピーク額', result.peak, 'var(--accent-good)'),
+    result.drawdownAge!=null
+      ? {label:'取り崩し開始年齢', kind:'age', raw:result.drawdownAge, accent:'var(--accent-cash)', warn:false}
+      : {label:'取り崩し開始年齢', kind:'none', raw:null, accent:'var(--accent-cash)', warn:false},
+    man('生涯収入(税引前)', result.cumulativeIncome, 'var(--accent-good)'),
+    man('生涯支出総額(インフレ加味後)', result.cumulativeExpense, 'var(--accent-cash)'),
+    man('生涯納税額(概算)', result.cumulativeTax, 'var(--accent-invest)'),
+    man('内 運用益課税(概算)', result.cumulativeGainsTax, 'var(--accent-principal)'),
+    man('運用益累計(税引前)', result.cumulativeGain, 'var(--accent-good)', result.cumulativeGain<0),
   ];
   if(result.depletionAge!=null){
-    cards.push({label:'資産枯渇年齢', value: result.depletionAge+'<small>歳</small>', accent:'var(--accent-warn)', warn:true});
+    cards.push({label:'資産枯渇年齢', kind:'age', raw:result.depletionAge, accent:'var(--accent-warn)', warn:true});
   }
   if(last.age < p.simEndAge){
-    cards.push({label:'両者死亡による試算終了年齢', value: last.age+'<small>歳</small>', accent:'var(--accent-cash)'});
+    cards.push({label:'両者死亡による試算終了年齢', kind:'age', raw:last.age, accent:'var(--accent-cash)', warn:false});
   }
+  return cards;
+}
+
+function renderStats(result, p){
+  const el = document.getElementById('statRow');
+  const cards = buildStatCards(result, p);
+  const valueHTML = c => c.kind==='man' ? manyen(c.raw)+'<small>万円</small>'
+    : c.kind==='age' ? c.raw+'<small>歳</small>' : '—';
   el.innerHTML = cards.map(c=>`
     <div class="stat-card" style="--stat-accent:${c.accent}">
       <div class="stat-label">${c.label}</div>
-      <div class="stat-value ${c.warn?'warn':''}">${c.value}</div>
+      <div class="stat-value ${c.warn?'warn':''}">${valueHTML(c)}</div>
     </div>
   `).join('');
   // インラインの grid-template-columns だとメディアクエリを上書きしてしまい、
@@ -2518,19 +2531,38 @@ function initTableTooltip(){
 /* Google Sheets へ貼り付けやすいよう、画面上の年次内訳を数値のTSVとして作る。
    Google Sheets API を使わないため、OAuthのクライアントIDや利用者の認可情報をHTMLに
    持たせずに済む。Google Sheets側でA1に貼り付けると列として展開される。 */
+/* 年次内訳の列定義。Google スプレッドシート用のTSVとExcel出力で共有する
+   (type: age=年齢 / amount=円の金額 / text=文字列) */
+const ANNUAL_COLUMNS = [
+  {header:'年齢', type:'age', get:r => r.age},
+  {header:'給与', type:'amount', get:r => r.salary},
+  {header:'少額収入', type:'amount', get:r => r.postRetIncome},
+  {header:'退職金', type:'amount', get:r => r.lump},
+  {header:'DC年金', type:'amount', get:r => r.dc},
+  {header:'個人年金', type:'amount', get:r => r.personalPension},
+  {header:'公的年金', type:'amount', get:r => r.pension + r.partnerPension + r.survivorPension},
+  {header:'内 加給年金', type:'amount', get:r => r.kakyuNenkin},
+  {header:'内 遺族厚生年金', type:'amount', get:r => r.survivorPension},
+  {header:'支出', type:'amount', get:r => r.expense + r.insurancePremium},
+  {header:'内 保険料', type:'amount', get:r => r.insurancePremium},
+  {header:'内 スポット支出', type:'amount', get:r => r.spotExpense},
+  {header:'スポット支出名', type:'text', get:r => r.spotLabel},
+  {header:'税金計', type:'amount', get:r => r.totalTax},
+  {header:'内 運用益課税', type:'amount', get:r => r.gainsTax},
+  {header:'純CF', type:'amount', get:r => r.netCashFlow},
+  {header:'現金残高', type:'amount', get:r => r.cash},
+  {header:'運用残高', type:'amount', get:r => r.invest},
+  {header:'総資産', type:'amount', get:r => r.total},
+];
+
 function buildAnnualBreakdownTSV(result){
-  const headers = [
-    '年齢', '給与', '少額収入', '退職金', 'DC年金', '個人年金', '公的年金', '内 加給年金', '内 遺族厚生年金',
-    '支出', '内 保険料', '内 スポット支出', 'スポット支出名',
-    '税金計', '内 運用益課税', '純CF', '現金残高', '運用残高', '総資産'
-  ];
+  const headers = ANNUAL_COLUMNS.map(c => c.header);
   const amount = value => String(Math.round(value || 0));
   const cleanText = value => String(value || '').replace(/[\t\r\n]/g, ' ');
-  const rows = result.rows.map(r => [
-    r.age, amount(r.salary), amount(r.postRetIncome), amount(r.lump), amount(r.dc), amount(r.personalPension), amount(r.pension + r.partnerPension + r.survivorPension), amount(r.kakyuNenkin), amount(r.survivorPension),
-    amount(r.expense + r.insurancePremium), amount(r.insurancePremium), amount(r.spotExpense), cleanText(r.spotLabel),
-    amount(r.totalTax), amount(r.gainsTax), amount(r.netCashFlow), amount(r.cash), amount(r.invest), amount(r.total),
-  ]);
+  const rows = result.rows.map(r => ANNUAL_COLUMNS.map(c => {
+    const value = c.get(r);
+    return c.type === 'age' ? value : c.type === 'text' ? cleanText(value) : amount(value);
+  }));
   return [headers, ...rows].map(row => row.join('\t')).join('\n');
 }
 
@@ -2978,6 +3010,7 @@ async function exportParamsToFile(){
       const writable = await handle.createWritable();
       await writable.write(json);
       await writable.close();
+      setLoadedParamFileName(handle.name); // 保存ダイアログで付け直した名前も反映されるよう、選ばれたハンドルの名前を使う
       showSaveStatus('ファイルに保存しました');
       return;
     }catch(e){
@@ -2994,13 +3027,16 @@ async function exportParamsToFile(){
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  setLoadedParamFileName(filename); // ダウンロード方式ではブラウザが付ける最終的な名前は分からないため、こちらで付けた名前を表示する
   showSaveStatus('ファイルをダウンロードしました');
 }
 
+let loadedParamFileNameValue = ''; // 画面の「読込ファイル」に表示中のファイル名(Excel出力にも載せる)
 function setLoadedParamFileName(name){
   const label = document.getElementById('loadedParamFileName');
-  if(!label) return;
   const safeName = (name || '').trim();
+  loadedParamFileNameValue = safeName;
+  if(!label) return;
   label.textContent = safeName ? `読込ファイル: ${safeName}` : '';
   label.title = safeName || '';
 }
@@ -3102,12 +3138,572 @@ function updateExpensePhaseLabels(){
 document.getElementById('expensePhase2StartAge').addEventListener('input', updateExpensePhaseLabels);
 updateExpensePhaseLabels();
 
+/* ================= Excel(.xlsx)出力 ================= */
+/* 外部ライブラリなしで、ブラウザ上で .xlsx を組み立てる。.xlsx は OOXML(XML)をZIPに詰めたものなので、
+   無圧縮(store)のZIPと必要最小限のXMLを自前で書いている。
+   シートは2枚: 「サマリー」(サマリーカード・入力パラメータ・3つのグラフ画像)と「年次内訳」(年次内訳表)。
+   グラフはExcelのグラフオブジェクトではなく、画面と同じ見た目のPNG画像として貼る
+   (系列の元データが年次内訳表に無い項目を含むため。数値を使いたい場合は年次内訳シートを参照する) */
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLSX_SHEET_SUMMARY = 'サマリー';
+const XLSX_SHEET_ANNUAL = '年次内訳';
+const EXPORT_CHART_W = 960;  // グラフ画像の描画幅。画面サイズ(スマホなど)によらず同じ見た目で出力する
+const EXPORT_CHART_H = 380;
+const XLSX_COLOR = {ink:'#1B2233', dim:'#5B6579', line:'#D7DEE8', head:'#EDF0F5', nav:'#1B2233', warn:'#D33A2C',
+  drawdownRow:'#FCE8C8', depletedRow:'#FBEAE8'};
+
+/* ---- ZIP(無圧縮) ---- */
+const CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){
+    let c = n;
+    for(let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for(let i = 0; i < bytes.length; i++) c = CRC32_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function buildZipBlob(files){
+  const enc = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name);
+    const data = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
+    const crc = crc32(data);
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(4, 20, true);       // 展開に必要なバージョン
+    local.setUint16(6, 0x0800, true);   // ファイル名はUTF-8
+    local.setUint16(8, 0, true);        // 圧縮方式: 無圧縮
+    local.setUint16(10, dosTime, true);
+    local.setUint16(12, dosDate, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, data.length, true);
+    local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);
+    parts.push(new Uint8Array(local.buffer), name, data);
+
+    const cen = new DataView(new ArrayBuffer(46));
+    cen.setUint32(0, 0x02014b50, true);
+    cen.setUint16(4, 20, true);
+    cen.setUint16(6, 20, true);
+    cen.setUint16(8, 0x0800, true);
+    cen.setUint16(10, 0, true);
+    cen.setUint16(12, dosTime, true);
+    cen.setUint16(14, dosDate, true);
+    cen.setUint32(16, crc, true);
+    cen.setUint32(20, data.length, true);
+    cen.setUint32(24, data.length, true);
+    cen.setUint16(28, name.length, true);
+    cen.setUint32(42, offset, true);
+    central.push(new Uint8Array(cen.buffer), name);
+    offset += 30 + name.length + data.length;
+  });
+  const centralSize = central.reduce((sum, c) => sum + c.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], {type: XLSX_MIME});
+}
+
+/* ---- XML部品 ---- */
+// XML 1.0 で使えない制御文字を落としてからエスケープする(入力欄のテキストがそのまま入り得るため)
+const xmlText = s => String(s)
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+const NS_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+function xlsxColName(index){ // 0始まり → A, B, ..., Z, AA
+  let s = '', n = index + 1;
+  while(n > 0){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+/* ---- スタイル(フォント・塗り・罫線・表示形式の組み合わせを登録して番号を返す) ---- */
+function createStyleBook(){
+  const fonts = [], fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
+  const borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
+  const numFmts = [], xfs = [], cache = new Map();
+  const BUILTIN_FMT = {'General': 0, '0': 1, '#,##0': 3};
+  const idxOf = (list, xml) => { let i = list.indexOf(xml); if(i < 0){ list.push(xml); i = list.length - 1; } return i; };
+  const argb = c => 'FF' + c.replace('#', '').toUpperCase();
+  const thin = `<color rgb="${argb(XLSX_COLOR.line)}"/>`;
+  const BORDER_ALL = `<border><left style="thin">${thin}</left><right style="thin">${thin}</right><top style="thin">${thin}</top><bottom style="thin">${thin}</bottom><diagonal/></border>`;
+
+  function style(o = {}){
+    const key = JSON.stringify(o);
+    if(cache.has(key)) return cache.get(key);
+    const font = `<font>${o.bold ? '<b/>' : ''}${o.italic ? '<i/>' : ''}<sz val="${o.size || 11}"/><color rgb="${argb(o.color || XLSX_COLOR.ink)}"/><name val="Yu Gothic"/><family val="3"/><charset val="128"/></font>`;
+    const fontId = idxOf(fonts, font);
+    const fillId = o.fill ? idxOf(fills, `<fill><patternFill patternType="solid"><fgColor rgb="${argb(o.fill)}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
+    const borderId = o.border ? idxOf(borders, BORDER_ALL) : 0;
+    let numFmtId = 0;
+    if(o.numFmt && o.numFmt !== 'General'){
+      if(o.numFmt in BUILTIN_FMT) numFmtId = BUILTIN_FMT[o.numFmt];
+      else numFmtId = 164 + idxOf(numFmts, o.numFmt);
+    }
+    const align = `<alignment${o.halign ? ` horizontal="${o.halign}"` : ''} vertical="${o.valign || 'center'}"${o.wrap ? ' wrapText="1"' : ''}/>`;
+    xfs.push(`<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="${fillId}" borderId="${borderId}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`);
+    cache.set(key, xfs.length - 1);
+    return xfs.length - 1;
+  }
+  style(); // 番号0は既定スタイル(Excelが未指定セルに使う)
+
+  function toXml(){
+    return XML_HEAD + `<styleSheet xmlns="${NS_MAIN}">`
+      + (numFmts.length ? `<numFmts count="${numFmts.length}">${numFmts.map((f, i) => `<numFmt numFmtId="${164 + i}" formatCode="${xmlText(f)}"/>`).join('')}</numFmts>` : '')
+      + `<fonts count="${fonts.length}">${fonts.join('')}</fonts>`
+      + `<fills count="${fills.length}">${fills.join('')}</fills>`
+      + `<borders count="${borders.length}">${borders.join('')}</borders>`
+      + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+      + `<cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs>`
+      + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+      + '</styleSheet>';
+  }
+  return {style, toXml};
+}
+
+/* ---- シート ---- */
+function createSheet(){
+  const rows = new Map(); // 行 -> Map(列 -> {v, s})
+  return {
+    colWidths: [], rowHeights: new Map(), merges: [], freeze: null, autoFilter: null,
+    showGrid: true, fitWidthLandscape: false, images: [],
+    set(r, c, v, s){
+      if(!rows.has(r)) rows.set(r, new Map());
+      rows.get(r).set(c, {v, s: s || 0});
+    },
+    fill(r, c0, c1, s){ for(let c = c0; c <= c1; c++) if(!(rows.has(r) && rows.get(r).has(c))) this.set(r, c, null, s); },
+    merge(r, c0, c1){ this.merges.push(`${xlsxColName(c0)}${r + 1}:${xlsxColName(c1)}${r + 1}`); },
+    rows,
+  };
+}
+function sheetToXml(sh, selected, drawingRelId){
+  let maxR = 0, maxC = 0;
+  sh.rows.forEach((cells, r) => { maxR = Math.max(maxR, r); cells.forEach((_, c) => { maxC = Math.max(maxC, c); }); });
+
+  let pane = '';
+  if(sh.freeze){
+    const {cols, rows: fr} = sh.freeze;
+    const topLeft = `${xlsxColName(cols)}${fr + 1}`;
+    const active = cols && fr ? 'bottomRight' : (fr ? 'bottomLeft' : 'topRight');
+    pane = `<pane${cols ? ` xSplit="${cols}"` : ''}${fr ? ` ySplit="${fr}"` : ''} topLeftCell="${topLeft}" activePane="${active}" state="frozen"/>`;
+    if(cols && fr){
+      pane += `<selection pane="topRight" activeCell="${xlsxColName(cols)}1" sqref="${xlsxColName(cols)}1"/>`
+        + `<selection pane="bottomLeft" activeCell="A${fr + 1}" sqref="A${fr + 1}"/>`
+        + `<selection pane="bottomRight" activeCell="${topLeft}" sqref="${topLeft}"/>`;
+    } else {
+      pane += `<selection pane="${active}" activeCell="${topLeft}" sqref="${topLeft}"/>`;
+    }
+  }
+
+  const cols = sh.colWidths.map((w, i) => w ? `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>` : '').join('');
+  const rowKeys = [...sh.rows.keys()].sort((a, b) => a - b);
+  const sheetData = rowKeys.map(r => {
+    const cells = [...sh.rows.get(r).entries()].sort((a, b) => a[0] - b[0]).map(([c, cell]) => {
+      const ref = `${xlsxColName(c)}${r + 1}`;
+      const s = cell.s ? ` s="${cell.s}"` : '';
+      const v = cell.v;
+      if(typeof v === 'number') return Number.isFinite(v) ? `<c r="${ref}"${s}><v>${v}</v></c>` : `<c r="${ref}"${s}/>`;
+      if(v == null || v === '') return `<c r="${ref}"${s}/>`;
+      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${xmlText(v)}</t></is></c>`;
+    }).join('');
+    const ht = sh.rowHeights.get(r);
+    return `<row r="${r + 1}"${ht ? ` ht="${ht}" customHeight="1"` : ''}>${cells}</row>`;
+  }).join('');
+
+  return XML_HEAD + `<worksheet xmlns="${NS_MAIN}" xmlns:r="${NS_REL}">`
+    + (sh.fitWidthLandscape ? '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>' : '')
+    + `<dimension ref="A1:${xlsxColName(maxC)}${maxR + 1}"/>`
+    + `<sheetViews><sheetView${sh.showGrid ? '' : ' showGridLines="0"'}${selected ? ' tabSelected="1"' : ''} workbookViewId="0">${pane}</sheetView></sheetViews>`
+    + '<sheetFormatPr defaultRowHeight="15"/>'
+    + (cols ? `<cols>${cols}</cols>` : '')
+    + `<sheetData>${sheetData}</sheetData>`
+    + (sh.autoFilter ? `<autoFilter ref="${sh.autoFilter}"/>` : '')
+    + (sh.merges.length ? `<mergeCells count="${sh.merges.length}">${sh.merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : '')
+    + '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'
+    + (sh.fitWidthLandscape ? '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>' : '')
+    + (drawingRelId ? `<drawing r:id="${drawingRelId}"/>` : '')
+    + '</worksheet>';
+}
+function drawingToXml(images){
+  const EMU = 9525; // 1px = 9525 EMU
+  const anchors = images.map((img, i) => `<xdr:oneCellAnchor>`
+    + `<xdr:from><xdr:col>${img.col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${img.row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>`
+    + `<xdr:ext cx="${img.w * EMU}" cy="${img.h * EMU}"/>`
+    + `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i + 2}" name="${xmlText(img.name)}" descr="${xmlText(img.name)}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>`
+    + `<xdr:blipFill><a:blip r:embed="rId${i + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>`
+    + `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${img.w * EMU}" cy="${img.h * EMU}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>`
+    + `<xdr:clientData/></xdr:oneCellAnchor>`).join('');
+  return XML_HEAD + `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${NS_REL}">${anchors}</xdr:wsDr>`;
+}
+const relsXml = rels => XML_HEAD + `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.map(r => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join('')}</Relationships>`;
+const REL_TYPE = p => `http://schemas.openxmlformats.org/officeDocument/2006/relationships/${p}`;
+
+/* sheets: [{name, sheet}](先頭が最初に開くシート)。sheet.images には {png(Uint8Array), w, h, col, row, name} を入れる */
+function buildXlsxBlob(sheets, styleBook){
+  const files = [];
+  const imageFiles = [];
+  const sheetRels = [];
+  const drawings = [];
+  sheets.forEach((s, i) => {
+    const imgs = s.sheet.images;
+    let drawingRelId = null;
+    if(imgs.length){
+      const drawingNo = drawings.length + 1;
+      drawings.push({no: drawingNo, sheetIndex: i, images: imgs.map(img => {
+        imageFiles.push({name: `xl/media/image${imageFiles.length + 1}.png`, data: img.png});
+        return {...img, file: `image${imageFiles.length}.png`};
+      })});
+      drawingRelId = 'rId1';
+      sheetRels.push({sheetIndex: i, xml: relsXml([{id: 'rId1', type: REL_TYPE('drawing'), target: `../drawings/drawing${drawingNo}.xml`}])});
+    }
+    files.push({name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetToXml(s.sheet, i === 0, drawingRelId)});
+  });
+
+  const contentTypes = XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    + '<Default Extension="xml" ContentType="application/xml"/>'
+    + '<Default Extension="png" ContentType="image/png"/>'
+    + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    + sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')
+    + drawings.map(d => `<Override PartName="/xl/drawings/drawing${d.no}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join('')
+    + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+    + '</Types>';
+  const workbook = XML_HEAD + `<workbook xmlns="${NS_MAIN}" xmlns:r="${NS_REL}"><bookViews><workbookView/></bookViews><sheets>`
+    + sheets.map((s, i) => `<sheet name="${xmlText(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')
+    + '</sheets></workbook>';
+  const workbookRels = relsXml([
+    ...sheets.map((_, i) => ({id: `rId${i + 1}`, type: REL_TYPE('worksheet'), target: `worksheets/sheet${i + 1}.xml`})),
+    {id: `rId${sheets.length + 1}`, type: REL_TYPE('styles'), target: 'styles.xml'},
+  ]);
+
+  const all = [
+    {name: '[Content_Types].xml', data: contentTypes},
+    {name: '_rels/.rels', data: relsXml([{id: 'rId1', type: REL_TYPE('officeDocument'), target: 'xl/workbook.xml'}])},
+    {name: 'xl/workbook.xml', data: workbook},
+    {name: 'xl/_rels/workbook.xml.rels', data: workbookRels},
+    {name: 'xl/styles.xml', data: styleBook.toXml()},
+    ...files,
+    ...sheetRels.map(r => ({name: `xl/worksheets/_rels/sheet${r.sheetIndex + 1}.xml.rels`, data: r.xml})),
+    ...drawings.map(d => ({name: `xl/drawings/drawing${d.no}.xml`, data: drawingToXml(d.images)})),
+    ...drawings.map(d => ({name: `xl/drawings/_rels/drawing${d.no}.xml.rels`,
+      data: relsXml(d.images.map((img, i) => ({id: `rId${i + 1}`, type: REL_TYPE('image'), target: `../media/${img.file}`})))})),
+    ...imageFiles,
+  ];
+  return buildZipBlob(all);
+}
+
+/* ---- グラフを画像にする ---- */
+/* グラフのSVGは色を CSS変数(var(--xxx))、文字の書式をページ側のCSSで指定しているため、SVG単体を画像化すると
+   色も書式も失われる。そこで、変数を実際の色に置き換え、文字用のCSSをSVG内に埋め込んでから画像化する。
+   Excelは白地なので、画面のテーマに関わらずライトテーマの配色で出力する(テーマの切り替えは同期処理の中だけで
+   行い、画面には描画されない)。グラフの幅は画面サイズで変わるため、出力中だけ固定サイズに描き直す */
+function captureChartsForExport(){
+  const root = document.documentElement;
+  const prevTheme = root.getAttribute('data-theme');
+  const specs = [
+    {wrapId: 'chartWrap', name: '資産推移'},
+    {wrapId: 'investChartWrap', name: '投資資産の内訳'},
+    {wrapId: 'incomeChartWrap', name: '収入内訳'},
+  ];
+  const wraps = specs.map(s => document.getElementById(s.wrapId));
+  const prevStyles = wraps.map(w => w.getAttribute('style'));
+  const captured = [];
+  try{
+    root.setAttribute('data-theme', 'light');
+    wraps.forEach(w => { w.style.width = EXPORT_CHART_W + 'px'; w.style.height = EXPORT_CHART_H + 'px'; });
+    renderChart(lastResult);
+    renderInvestChart(lastResult);
+    renderIncomeChart(lastResult);
+
+    const rootStyle = getComputedStyle(root);
+    const cssVar = name => rootStyle.getPropertyValue(name).trim();
+    const resolveVars = str => str.replace(/var\((--[\w-]+)\)/g, (_, name) => cssVar(name));
+    const colors = {bg: cssVar('--bg-panel'), border: cssVar('--border'), title: cssVar('--text-1'), text: cssVar('--text-2')};
+    const fonts = {display: cssVar('--font-display'), mono: cssVar('--font-mono')};
+
+    specs.forEach((spec, i) => {
+      const card = wraps[i].closest('.chart-card');
+      const svgEl = wraps[i].querySelector('svg');
+      const clone = svgEl.cloneNode(true);
+      const [, , vbW, vbH] = svgEl.getAttribute('viewBox').split(/\s+/).map(Number);
+      clone.setAttribute('width', vbW);
+      clone.setAttribute('height', vbH);
+      const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      styleEl.textContent = `text{font-family:${fonts.mono};fill:${colors.text};}`; // ページ側の ".chart-wrap svg text" と同じ指定
+      clone.insertBefore(styleEl, clone.firstChild);
+      const svg = resolveVars(new XMLSerializer().serializeToString(clone));
+
+      const legend = [...card.querySelectorAll('.legend > span')].map(span => {
+        const sw = span.querySelector('.swatch');
+        const cs = getComputedStyle(sw);
+        const dashed = sw.classList.contains('dashed');
+        let color = dashed ? cs.borderTopColor : cs.backgroundColor;
+        // 「合計資産」の見本だけ白固定(ダーク用)。白地では見えないので、合計ラインの色に置き換える
+        if(color === 'rgb(255, 255, 255)') color = cssVar('--chart-total-line');
+        return {label: span.textContent.trim(), kind: dashed ? 'dashed' : (cs.borderRadius.includes('%') ? 'circle' : 'box'), color};
+      });
+      captured.push({name: spec.name, title: card.querySelector('h2').textContent.trim(), legend, svg, vbW, vbH, colors, fonts});
+    });
+  } finally {
+    wraps.forEach((w, i) => { if(prevStyles[i] === null) w.removeAttribute('style'); else w.setAttribute('style', prevStyles[i]); });
+    if(prevTheme === null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', prevTheme);
+    redrawCharts(); // 画面のグラフを元のサイズ・テーマで描き直す
+  }
+  return captured;
+}
+
+/* タイトル+凡例+グラフ本体を1枚のPNGにまとめる。戻り値の w/h は画像の論理サイズ(px)で、実際の画素数は2倍 */
+async function renderChartPng(cap){
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = () => reject(new Error(`chart image load failed: ${cap.name}`));
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(cap.svg);
+  });
+  // Webフォントの読み込み待ち。回線が遅い・オフラインで読み込みが終わらないときに出力が止まらないよう、待つのは最大1.5秒
+  if(document.fonts && document.fonts.ready){
+    await Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1500))]);
+  }
+
+  const PAD = 16, SCALE = 2, TITLE_H = 34, LEGEND_ROW_H = 20, ITEM_GAP = 18, SW_W = 14, SW_GAP = 6;
+  const W = cap.vbW + PAD * 2;
+  const legendFont = `11.5px ${cap.fonts.mono}`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = legendFont;
+
+  // 凡例を折り返しながら並べて、必要な高さを求める
+  let x = PAD, row = 0;
+  const placed = cap.legend.map(item => {
+    const itemW = SW_W + SW_GAP + measure.measureText(item.label).width;
+    if(x > PAD && x + itemW > W - PAD){ x = PAD; row++; }
+    const pos = {...item, x, row};
+    x += itemW + ITEM_GAP;
+    return pos;
+  });
+  const legendH = (row + 1) * LEGEND_ROW_H;
+  const H = PAD + TITLE_H + legendH + 8 + cap.vbH + PAD / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  ctx.fillStyle = cap.colors.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = cap.colors.border;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = cap.colors.title;
+  ctx.font = `bold 15px ${cap.fonts.display}`;
+  ctx.fillText(cap.title, PAD, PAD + TITLE_H / 2 - 4);
+
+  const legendTop = PAD + TITLE_H;
+  ctx.font = legendFont;
+  placed.forEach(item => {
+    const cy = legendTop + item.row * LEGEND_ROW_H + LEGEND_ROW_H / 2;
+    ctx.fillStyle = item.color;
+    ctx.strokeStyle = item.color;
+    if(item.kind === 'dashed'){
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(item.x, cy); ctx.lineTo(item.x + SW_W, cy); ctx.stroke();
+      ctx.setLineDash([]);
+    } else if(item.kind === 'circle'){
+      ctx.beginPath(); ctx.arc(item.x + SW_W / 2, cy, 5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.beginPath();
+      if(ctx.roundRect) ctx.roundRect(item.x + 2, cy - 5, 10, 10, 3); else ctx.rect(item.x + 2, cy - 5, 10, 10);
+      ctx.fill();
+    }
+    ctx.fillStyle = cap.colors.text;
+    ctx.fillText(item.label, item.x + SW_W + SW_GAP, cy);
+  });
+
+  ctx.drawImage(img, PAD, legendTop + legendH + 8, cap.vbW, cap.vbH);
+
+  const blob = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('png encode failed')), 'image/png'));
+  return {png: new Uint8Array(await blob.arrayBuffer()), w: Math.round(W), h: Math.round(H), name: cap.name};
+}
+
+/* ---- シートの中身 ---- */
+function buildSummarySheet(sb, cards, groups, dateStr, paramFileName){
+  const sh = createSheet();
+  const C = XLSX_COLOR;
+  sh.showGrid = false;
+  sh.colWidths = [42, 16, 26, 3]; // A:項目 B:値 C:単位 D:余白(この右にグラフを置く)
+  const sTitle = sb.style({bold: true, size: 18});
+  const sNote = sb.style({size: 10, color: C.dim});
+  const sSection = sb.style({bold: true, size: 12, color: '#FFFFFF', fill: C.nav});
+  const sGroup = sb.style({bold: true, fill: C.head, border: true});
+  const sLabel = sb.style({border: true, wrap: true});
+  const sUnit = sb.style({border: true, color: C.dim, size: 10});
+  const numStyle = (fmt, warn) => sb.style({border: true, halign: 'right', numFmt: fmt, ...(warn ? {bold: true, color: C.warn} : {})});
+  const sText = sb.style({border: true, halign: 'right', wrap: true});
+
+  let r = 0;
+  sh.set(r, 0, '退職後資産シミュレーション', sTitle);
+  sh.rowHeights.set(r, 30);
+  r++;
+  sh.set(r, 0, `作成: ${dateStr}　/　税額はすべて概算です`, sNote);
+  r += 2;
+  // 読込(または保存)したパラメータファイルの名前。ブラウザはフォルダの場所(パス)を教えてくれないため、名前のみ
+  sh.set(r, 0, 'パラメータファイル名', sb.style({bold: true, fill: C.head, border: true}));
+  sh.set(r, 1, paramFileName || '(読込・保存なし)', sb.style({border: true, halign: 'left', wrap: true, ...(paramFileName ? {} : {color: C.dim})}));
+  sh.set(r, 2, null, sb.style({border: true}));
+  sh.merge(r, 1, 2);
+  r += 2;
+
+  const section = title => { sh.set(r, 0, title, sSection); sh.fill(r, 1, 2, sSection); sh.merge(r, 0, 2); r++; };
+
+  section('サマリー');
+  cards.forEach(c => {
+    sh.set(r, 0, c.label, sLabel);
+    if(c.kind === 'man'){
+      sh.set(r, 1, Math.round(c.raw / 10000), numStyle('#,##0', c.warn));
+      sh.set(r, 2, '万円', sUnit);
+    } else if(c.kind === 'age'){
+      sh.set(r, 1, c.raw, numStyle('0', c.warn));
+      sh.set(r, 2, '歳', sUnit);
+    } else {
+      sh.set(r, 1, '—', sText);
+      sh.set(r, 2, '', sUnit);
+    }
+    r++;
+  });
+  r++;
+
+  section('入力パラメータ');
+  groups.forEach((items, title) => {
+    sh.set(r, 0, title, sGroup); sh.fill(r, 1, 2, sGroup); sh.merge(r, 0, 2);
+    r++;
+    items.forEach(it => {
+      sh.set(r, 0, it.label, sLabel);
+      if(it.num !== null) sh.set(r, 1, it.num, numStyle(it.isAmount ? '#,##0' : 'General', false));
+      else sh.set(r, 1, it.value, sText);
+      sh.set(r, 2, it.unit === '任意' ? '' : it.unit, sUnit);
+      r++;
+    });
+  });
+  return sh;
+}
+
+function buildAnnualSheet(sb, result){
+  const sh = createSheet();
+  const C = XLSX_COLOR;
+  sh.fitWidthLandscape = true;
+  const cols = ANNUAL_COLUMNS;
+  sh.colWidths = cols.map(c => c.type === 'text' ? 22 : c.type === 'age' ? 8 : 14);
+  sh.set(0, 0, `単位: 円(税額はすべて概算)　/　橙の行=取り崩し開始年齢、赤の行=資産枯渇後`, sb.style({size: 10, color: C.dim}));
+  const sHead = sb.style({bold: true, fill: C.head, border: true, halign: 'center', wrap: true});
+  cols.forEach((c, i) => sh.set(1, i, c.header, sHead));
+  sh.rowHeights.set(1, 32);
+
+  result.rows.forEach((row, n) => {
+    const fill = result.drawdownAge === row.age ? C.drawdownRow
+      : (result.depletionAge != null && row.age >= result.depletionAge) ? C.depletedRow : null;
+    const base = fill ? {border: true, fill} : {border: true};
+    cols.forEach((c, i) => {
+      const value = c.get(row);
+      if(c.type === 'age') sh.set(2 + n, i, row.age, sb.style({...base, halign: 'center', numFmt: '0"歳"'}));
+      else if(c.type === 'amount') sh.set(2 + n, i, Math.round(value || 0), sb.style({...base, halign: 'right', numFmt: '#,##0;[Red]-#,##0'}));
+      else sh.set(2 + n, i, String(value || ''), sb.style({...base, halign: 'left'}));
+    });
+  });
+  sh.freeze = {cols: 1, rows: 2};
+  sh.autoFilter = `A2:${xlsxColName(cols.length - 1)}${result.rows.length + 2}`;
+  return sh;
+}
+
+async function buildExcelWorkbook(){
+  calculate(); // 入力欄の現在値で試算し直し、パラメータ・カード・グラフ・表がすべて同じ結果に基づくようにする
+  const result = lastResult;
+  const p = readParams();
+  const pad = n => String(n).padStart(2, '0');
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  const captured = captureChartsForExport();
+  const pngs = [];
+  for(const cap of captured) pngs.push(await renderChartPng(cap)); // 順番に処理(同時に大きなcanvasを作らない)
+
+  const sb = createStyleBook();
+  const summary = buildSummarySheet(sb, buildStatCards(result, p), collectInputSummary(), dateStr, loadedParamFileNameValue);
+  const ROW_PX = 20; // 既定の行の高さ(15pt)
+  let row = 1; // 1行目はタイトルなので、グラフは2行目から
+  pngs.forEach(img => {
+    summary.images.push({...img, col: 4, row});
+    row += Math.ceil(img.h / ROW_PX) + 2;
+  });
+  const annual = buildAnnualSheet(sb, result);
+  return buildXlsxBlob([{name: XLSX_SHEET_SUMMARY, sheet: summary}, {name: XLSX_SHEET_ANNUAL, sheet: annual}], sb);
+}
+
+/* ダウンロードするExcelのファイル名。パラメータファイルを読み込み(または保存)している場合は、その名前の拡張子だけを
+   .xlsx にしたものにする。ファイル名に使えない文字は取り除き、名前が無い(または空になる)場合は日付入りの既定名にする */
+function excelDownloadFilename(paramFileName, now){
+  const base = String(paramFileName || '')
+    .replace(/\.json$/i, '')
+    .replace(/[\u0000-\u001F\\/:*?"<>|]/g, '_')
+    .trim()
+    .slice(0, 150);
+  if(base) return `${base}.xlsx`;
+  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+  return `退職後資産シミュレーション_${stamp}.xlsx`;
+}
+
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+document.getElementById('excelBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('excelBtn');
+  if(btn.disabled) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '作成中…';
+  try{
+    const blob = await buildExcelWorkbook();
+    downloadBlob(blob, excelDownloadFilename(loadedParamFileNameValue, new Date()));
+  } catch(e){
+    console.error(e);
+    alert('Excelファイルを作成できませんでした。ブラウザを更新してもう一度お試しください。');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+
 /* ================= PDFレポート出力 ================= */
 // 印刷時はサイドバーが非表示になるため、入力パラメータを左パネルの表示内容から
 // そのまま抽出して、印刷専用のサマリーとして本文側に差し込む(印刷結果だけで
 // 内容が読めるようにするため)
-function buildPrintSummaryHTML(){
-  const groups = new Map(); // グループ見出し -> 項目HTMLの配列
+function collectInputSummary(){
+  const groups = new Map(); // グループ見出し -> 項目の配列
   [...INPUT_IDS, ...CHECKBOX_IDS].forEach(id => {
     const el = document.getElementById(id);
     if(!el) return;
@@ -3116,27 +3712,45 @@ function buildPrintSummaryHTML(){
     const groupEl = el.closest('.group');
     const groupTitle = groupEl ? groupEl.querySelector('.group-title').textContent.trim() : 'その他';
 
-    let label, value;
+    // value=表示用の文字列(PDF用)、num/unit=数値として扱える項目の値と単位(Excel用)
+    let label, value, num = null, unit = '';
     if(el.type === 'checkbox'){
       label = el.closest('label.checkline').textContent.trim();
       value = el.checked ? 'ON' : 'OFF';
     } else {
       const labelEl = el.closest('.field').querySelector('label');
-      const unit = labelEl.querySelector('.unit') ? labelEl.querySelector('.unit').textContent : '';
-      label = labelEl.textContent.replace(unit, '').trim();
+      const unitEl = labelEl.querySelector('.unit');
+      unit = unitEl ? unitEl.textContent : '';
+      // 単位の文字列で置換すると「継続年数」の「年」まで消えてしまうため、単位の要素そのものを除いて読む
+      const labelClone = labelEl.cloneNode(true);
+      const unitClone = labelClone.querySelector('.unit');
+      if(unitClone) unitClone.remove();
+      label = labelClone.textContent.trim();
       if(el.tagName === 'SELECT'){
         value = el.options[el.selectedIndex].text;
+        unit = '';
       } else {
         // 金額欄はカンマ区切りで表示しているため、parseFloat ではなく parseAmount で読む
         const raw = el.value.trim();
-        const num = AMOUNT_INPUT_IDS.includes(id) ? parseAmount(raw) : parseFloat(raw);
-        value = raw !== '' && Number.isFinite(num) ? num.toLocaleString('ja-JP') + unit : (raw || '—');
+        const parsed = AMOUNT_INPUT_IDS.includes(id) ? parseAmount(raw) : parseFloat(raw);
+        if(raw !== '' && Number.isFinite(parsed)){
+          num = parsed;
+          value = parsed.toLocaleString('ja-JP') + unit;
+        } else {
+          value = raw || '—';
+          unit = '';
+        }
       }
     }
     if(spotRow) label = `スポット${spotRow.dataset.spot}・${label}`; // 同じラベルが3行ぶん並ぶため区別できるようにする
     if(!groups.has(groupTitle)) groups.set(groupTitle, []);
-    groups.get(groupTitle).push(`<div class="print-item"><span class="print-label">${escapeHtml(label)}</span><span class="print-value">${escapeHtml(value)}</span></div>`);
+    groups.get(groupTitle).push({label, value, num, unit, isAmount: AMOUNT_INPUT_IDS.includes(id)});
   });
+  return groups;
+}
+function buildPrintSummaryHTML(){
+  const groups = new Map([...collectInputSummary()].map(([title, items]) => [title,
+    items.map(it => `<div class="print-item"><span class="print-label">${escapeHtml(it.label)}</span><span class="print-value">${escapeHtml(it.value)}</span></div>`)]));
 
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
