@@ -650,8 +650,9 @@ td[data-col]{cursor:help;}
   font-weight:700;
 }
 .expense-cat-total-annual span:last-child{color:var(--accent-invest);}
-.modal-actions{margin-top:18px;display:flex;justify-content:flex-end;}
+.modal-actions{margin-top:18px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;}
 .modal-actions .run-btn{width:auto;padding:11px 20px;font-size:12.5px;}
+.modal-actions .sheets-btn{padding:11px 20px;font-size:12.5px;}
 
 /* ---------- 印刷用サマリー(入力パラメータ) ---------- */
 .print-summary{
@@ -849,9 +850,14 @@ td[data-col]{cursor:help;}
     <div class="group">
       <div class="group-title">支出</div>
       <div class="field-row">
-        <div class="field"><label>年間支出<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="annualExpense" value=""></div>
+        <div class="field"><label>年間支出(<span class="expense-phase1-label">〜65歳</span>)<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="annualExpense" value=""></div>
         <div class="field"><label>支出上昇率<span class="unit">%/年</span></label><input type="number" id="inflationRate" value="1.0" step="0.1"></div>
       </div>
+      <div class="field-row">
+        <div class="field"><label>支出変更年齢<span class="unit">歳</span></label><input type="number" id="expensePhase2StartAge" value="66"></div>
+        <div class="field"><label>年間支出(<span class="expense-phase2-label">66歳〜</span>)<span class="unit">円/年</span></label><input type="text" inputmode="numeric" id="annualExpense2" value=""></div>
+      </div>
+      <div class="table-note" style="padding:0 0 2px;">「支出変更年齢」に達した年から2段目の年間支出へ切り替えます(現役・再雇用中と年金生活とで生活費が変わる想定です)。どちらの段にも支出上昇率と「ライフステージ・リスク設定」の年齢帯別の支出倍率が同じように掛かります</div>
       <button class="sheets-btn" id="expenseBreakdownBtn" type="button" style="margin-top:9px;">月次の科目別に計算する</button>
     </div>
 
@@ -1073,7 +1079,7 @@ td[data-col]{cursor:help;}
     </div>
 
     <div class="footnote">
-      <b>試算の前提について:</b> 税額は令和8年(2026年)分の税制を簡易的に適用した概算です(給与所得控除・公的年金等控除・基礎控除・所得税速算表・住民税10%+均等割を使用)。社会保険料控除・医療費控除・配偶者控除は「社会保険料・追加控除」欄で計算に含めるかどうかを選べます(下記参照)。それ以外の控除(扶養控除、iDeCoの掛金控除など)は考慮していません。退職金は分離課税・1/2課税、DC・個人年金・公的年金は総合課税の雑所得として計算しています(個人年金もDCと同様、簡易的に公的年金等控除の対象として計算しています)。退職後の少額収入は給与所得として、他の給与と合算して給与所得控除・総合課税を適用します(開始年齢〜継続年数の期間のみ加算し、収支は現金保有目標に基づき自動でリバランスされます)。パートナーの年金は本人とは別世帯主体として個別に確定申告する前提で課税額を計算しています(パートナーの年齢は「本人との年齢差」から求めた実年齢を使用。社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用し、パートナー自身の申告には適用していません)。退職一時金は税引後の金額を「受取時の現金配分比率」に従って現金と運用資産へ即時に振り分け、以降の毎年の収支(給与・DC・個人年金・年金-税金-社会保険料-支出)は現金保有目標(円、固定額・物価上昇による自動調整はなし)に基づき別途自動でリバランスされます。実際の税額・手取りとは差異が生じますので、正式な判断には税理士等にご確認ください。運用資産の利回りは一定率で複利計算しており、市場変動リスクは反映していません。<br><b>グラフの点線(運用元本)について:</b> 運用資産へ投じた累計額(運用益を含まない金額)を、現金残高の上に積んだ位置に表示しています。したがって<b>点線と白い合計ラインの差が、その時点の運用損益(含み益)</b>にあたります。取り崩し時に元本をどう減らすかは左側の「取り崩し時の元本の減らし方」で切り替えられます(比例配分=残高に占める元本と運用益の比率で按分、運用益から先に取り崩す=運用益を使い切ってから元本に手をつける)。<br><b>NISA・運用益課税について:</b> 「NISA枠を優先して埋める」(既定ON)の場合、運用へ回す資金は毎年、NISAの年間投資枠(既定360万円)と生涯投資枠(既定1,800万円)の空きに優先して入り、入りきらない分が特定口座になります(OFFにすると、NISAへは新規に投資せず全額が特定口座になります)。枠はいずれも簿価(取得額)ベースで管理し、NISAを売却した場合はその簿価分の生涯枠が翌年に復活します。取り崩しは特定口座から先に行い、売却益に対して既定20.315%(所得税15.315%+住民税5%)を課税します。源泉徴収と同じく税引後の手取りが必要額になるよう売却額を割り戻しているため、課税口座の含み益が大きいほど多く売却することになります。この運用益課税は年次内訳の「税金計」に<b>内数</b>(カッコ内)として含めています。なお、譲渡損失の繰越控除、配当・分配金への課税、NISAの成長投資枠1,200万円の内枠、金融商品の売却順序の最適化は考慮していません。「NISA年間枠に沿って積立」をONにすると、その年のNISA年間枠に入りきらない投資資金は特定口座へ回さず現金として保有し、翌年以降にNISA年間枠が空き次第優先的に投資します(現金保有目標を上回った状態がしばらく続くことがあります)。ただしNISAの生涯投資枠を使い切った後は、それ以上NISAへ投資する余地がないため、通常どおり特定口座へ投資します。「特定口座からNISAへ毎年移し替える」(既定OFF)をONにすると、新たに投資へ回す資金がない年でも、毎年NISA年間枠の空き分だけ特定口座を売却し、税引後の手取りをそのままNISAで買い直します(いわゆるリレー投資)。退職後で追加の入金がない場合でも生涯投資枠を使い切るまでNISAへ移していけますが、移し替えのための売却でその都度、含み益に対して運用益課税がかかります(その代わり、移し替えた後の値上がり分は非課税になります)。移し替えは現金の増減を伴わないため、投資資産の内訳グラフの「取り崩し」には含めていません(売却で支払った税額は「運用益課税」に含まれます)。<br><b>投資資産の内訳グラフについて:</b> 下3段のNISA枠(元本)・特定口座(元本)・運用益(含み益)で、その年の運用残高(NISA+特定口座の合計)をちょうど分解しています。上2段の取り崩し(売却手取り)と運用益課税は、残高ではなくその年の<b>フロー</b>項目のため、取り崩しがあった年はバーの高さが残高よりその分高くなります。取り崩しの段は<b>その年に運用資産を売却して得た手取り</b>(売却総額-運用益課税)で、これを残高のすぐ上に積んでいるため、<b>その段の下端がその年の運用残高、上端が「取り崩さなければ残っていた額」の目安</b>になります。取り崩し(灰色)+運用益課税(赤)が、その年に運用資産から出ていった額です(通常はその年の売却総額と一致します。NISAへの移し替えを行った年は、移し替えた元本は運用資産の中に残るため灰色には含めず、移し替えで支払った税額だけが赤に含まれます)。なお、収入内訳グラフの「取り崩し」は<b>世帯の収支不足額</b>で、現金から補填した分も含むため、こちらの数字とは一致しません(現金だけで賄えた年はこのグラフの取り崩しは0になります)。含み損(運用益がマイナス)の年は、運用益の棒を0として表示します(実際の値はホバーのツールチップでご確認ください)。<br><b>社会保険料・医療費控除・配偶者控除について:</b> 「社会保険料・追加控除」欄のチェックボックスで、これらをまとめて計算に含めるかどうかを切り替えられます。健康保険・介護保険料等の社会保険料は、現役時代は給与に対する概算料率(既定15%)、退職後(給与終了後)は年額(既定40万円、物価上昇率で調整)で概算し、社会保険料控除として税額を軽減するだけでなく、実際の支出としても収支に反映します(年次内訳の「支出」列に内数で表示)。医療費控除は、入力した年間医療費(本人+パートナー合算を想定)から「10万円と総所得金額の5%の低い方」を差し引いた額(上限200万円)を、本人の総所得金額から控除します。配偶者控除は「配偶者控除の対象となる配偶者がいる」にチェックを入れた場合のみ適用し、パートナーの年金額(既存パラメータ)から配偶者の合計所得金額を自動判定します。配偶者の合計所得金額が48万円を超える場合は控除0とし、より複雑な配偶者特別控除(48万円超133万円以下で段階的に減る控除)は考慮していません。配偶者の年齢は「本人との年齢差」から求めた実年齢を使用します(70歳以上の場合の割増控除額の判定に使用)。社会保険料控除・医療費控除・配偶者控除はいずれも本人の確定申告にのみ適用し、パートナー自身の(別世帯主体としての)申告には適用していません。<br><b>ライフステージ・リスク設定について:</b> 年間支出は「年間支出×(1+支出上昇率)^経過年数×年齢帯別の支出倍率」で算出します(初期値は74歳まで100%、75〜84歳85%、85歳以降90%)。スポット(一時的)支出は最大3件まで登録でき、指定した年齢の年に一度だけ支出へ加算します(「物価上昇率を適用する」をONにした行は、入力額を現在価値とみなして発生年までの上昇分を上乗せします)。運用利回りは「年齢に応じて運用利回りを切り替える」がONの場合、65歳まで・66〜75歳・76歳以降の3段階(初期値3.5%/2.5%/1.5%)を年齢に応じて適用し、OFFの場合は「資産・運用」欄の運用利回りを全年齢に一律適用します。いずれも年齢による決め打ちの想定であり、実際の支出の推移や市場の変動を予測するものではありません。<br><b>公的年金の繰上げ・繰下げについて:</b> 「繰上げ・繰下げ受給による年額の増減を自動調整する」がONの場合、入力した年額を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます(繰上げ=1ヶ月あたり-0.4%・最大-24%、繰下げ=1ヶ月あたり+0.7%・最大+84%)。パートナーの年金にも同じ率を適用し、こちらはパートナー自身の受給開始年齢で判定します(受給が始まるのが本人の何歳のときかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は制度の上下限に丸めて計算します。在職老齢年金による支給停止は考慮していません。<br><b>加給年金について:</b> 「加給年金を追加する」(既定OFF)をONにすると、本人の厚生年金加入期間が20年以上ある(「受給要件」チェックボックスで指定)前提で、本人が65歳に達して年金を受給中(繰上げ受給を選んでいても加給年金自体は65歳より前には始まらず、繰下げ待機中も年金と同様に不支給です)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額(年額、既定40万8,100円・概算)を上乗せします。パートナーが65歳になった時点で打ち切られ、配偶者の年金に付く「振替加算」は考慮していません。子の加算、配偶者自身の所得や厚生年金加入期間による支給停止にも対応していません。<br><b>死亡・遺族厚生年金について:</b> 「本人の死亡年齢を設定する」「パートナーの死亡年齢を設定する」(既定OFF)をそれぞれONにすると、指定した年齢に達した年から、その人の給与・退職後の少額収入・退職金・DC年金・個人年金・公的年金(加給年金含む)をすべて0として扱います(死亡年齢そのものの年も含む)。「遺族厚生年金を計算に含める」をONにすると、死亡した人について入力した老齢厚生年金相当額(報酬比例部分。基礎年金分は含めない)の3/4を、生存側に非課税(所得税・住民税とも課税対象外)で毎年上乗せします。中高齢寡婦加算(現行制度では40〜64歳の妻のみが対象で、このアプリは性別を管理していないため非対応)、65歳以降に生存側自身の老齢厚生年金と遺族厚生年金を調整する仕組み、遺族基礎年金(子のある配偶者・子のみが対象で、このアプリは子を考慮していないため非対応)、支給要件(保険料納付済期間など)の判定は考慮していません。配偶者控除は、パートナーが死亡した年より後は適用しません。生存側の生活費(支出)は死亡前と変更せず試算します。本人・パートナーの両方が死亡した年より後は、年次内訳・グラフともに行を生成せず試算を打ち切ります。<br><b>収入内訳グラフについて:</b> 給与・DC年金・個人年金・公的年金は税引前(額面)の金額を表示しています。公的年金は<b>本人・パートナーを別の色(赤系統の濃淡)</b>で分けて積み上げています。「取り崩し」は、税引後の収入(給与等-税金-社会保険料)だけではその年の支出を賄えなかった不足分で、<b>投資資産の内訳グラフの取り崩し(売却手取り)と同じ薄い灰色</b>で表示しています(ただしこちらは現金からの補填も含む世帯ベースの不足額のため、投資資産の内訳グラフの数字とは一致しません)。赤字の年は、棒の合計(税引前収入+取り崩し)は「年間支出(生活費)」の線ではなく、生活費に社会保険料・税金を加えた「支出+保険料+税金(実質支出)」の線と一致します。2本の線の間隔が、その年の社会保険料+税額に相当します。
+      <b>試算の前提について:</b> 税額は令和8年(2026年)分の税制を簡易的に適用した概算です(給与所得控除・公的年金等控除・基礎控除・所得税速算表・住民税10%+均等割を使用)。社会保険料控除・医療費控除・配偶者控除は「社会保険料・追加控除」欄で計算に含めるかどうかを選べます(下記参照)。それ以外の控除(扶養控除、iDeCoの掛金控除など)は考慮していません。退職金は分離課税・1/2課税、DC・個人年金・公的年金は総合課税の雑所得として計算しています(個人年金もDCと同様、簡易的に公的年金等控除の対象として計算しています)。退職後の少額収入は給与所得として、他の給与と合算して給与所得控除・総合課税を適用します(開始年齢〜継続年数の期間のみ加算し、収支は現金保有目標に基づき自動でリバランスされます)。パートナーの年金は本人とは別世帯主体として個別に確定申告する前提で課税額を計算しています(パートナーの年齢は「本人との年齢差」から求めた実年齢を使用。社会保険料控除・医療費控除・配偶者控除は本人の申告にのみ適用し、パートナー自身の申告には適用していません)。退職一時金は税引後の金額を「受取時の現金配分比率」に従って現金と運用資産へ即時に振り分け、以降の毎年の収支(給与・DC・個人年金・年金-税金-社会保険料-支出)は現金保有目標(円、固定額・物価上昇による自動調整はなし)に基づき別途自動でリバランスされます。実際の税額・手取りとは差異が生じますので、正式な判断には税理士等にご確認ください。運用資産の利回りは一定率で複利計算しており、市場変動リスクは反映していません。<br><b>グラフの点線(運用元本)について:</b> 運用資産へ投じた累計額(運用益を含まない金額)を、現金残高の上に積んだ位置に表示しています。したがって<b>点線と白い合計ラインの差が、その時点の運用損益(含み益)</b>にあたります。取り崩し時に元本をどう減らすかは左側の「取り崩し時の元本の減らし方」で切り替えられます(比例配分=残高に占める元本と運用益の比率で按分、運用益から先に取り崩す=運用益を使い切ってから元本に手をつける)。<br><b>NISA・運用益課税について:</b> 「NISA枠を優先して埋める」(既定ON)の場合、運用へ回す資金は毎年、NISAの年間投資枠(既定360万円)と生涯投資枠(既定1,800万円)の空きに優先して入り、入りきらない分が特定口座になります(OFFにすると、NISAへは新規に投資せず全額が特定口座になります)。枠はいずれも簿価(取得額)ベースで管理し、NISAを売却した場合はその簿価分の生涯枠が翌年に復活します。取り崩しは特定口座から先に行い、売却益に対して既定20.315%(所得税15.315%+住民税5%)を課税します。源泉徴収と同じく税引後の手取りが必要額になるよう売却額を割り戻しているため、課税口座の含み益が大きいほど多く売却することになります。この運用益課税は年次内訳の「税金計」に<b>内数</b>(カッコ内)として含めています。なお、譲渡損失の繰越控除、配当・分配金への課税、NISAの成長投資枠1,200万円の内枠、金融商品の売却順序の最適化は考慮していません。「NISA年間枠に沿って積立」をONにすると、その年のNISA年間枠に入りきらない投資資金は特定口座へ回さず現金として保有し、翌年以降にNISA年間枠が空き次第優先的に投資します(現金保有目標を上回った状態がしばらく続くことがあります)。ただしNISAの生涯投資枠を使い切った後は、それ以上NISAへ投資する余地がないため、通常どおり特定口座へ投資します。「特定口座からNISAへ毎年移し替える」(既定OFF)をONにすると、新たに投資へ回す資金がない年でも、毎年NISA年間枠の空き分だけ特定口座を売却し、税引後の手取りをそのままNISAで買い直します(いわゆるリレー投資)。退職後で追加の入金がない場合でも生涯投資枠を使い切るまでNISAへ移していけますが、移し替えのための売却でその都度、含み益に対して運用益課税がかかります(その代わり、移し替えた後の値上がり分は非課税になります)。移し替えは現金の増減を伴わないため、投資資産の内訳グラフの「取り崩し」には含めていません(売却で支払った税額は「運用益課税」に含まれます)。<br><b>投資資産の内訳グラフについて:</b> 下3段のNISA枠(元本)・特定口座(元本)・運用益(含み益)で、その年の運用残高(NISA+特定口座の合計)をちょうど分解しています。上2段の取り崩し(売却手取り)と運用益課税は、残高ではなくその年の<b>フロー</b>項目のため、取り崩しがあった年はバーの高さが残高よりその分高くなります。取り崩しの段は<b>その年に運用資産を売却して得た手取り</b>(売却総額-運用益課税)で、これを残高のすぐ上に積んでいるため、<b>その段の下端がその年の運用残高、上端が「取り崩さなければ残っていた額」の目安</b>になります。取り崩し(灰色)+運用益課税(赤)が、その年に運用資産から出ていった額です(通常はその年の売却総額と一致します。NISAへの移し替えを行った年は、移し替えた元本は運用資産の中に残るため灰色には含めず、移し替えで支払った税額だけが赤に含まれます)。なお、収入内訳グラフの「取り崩し」は<b>世帯の収支不足額</b>で、現金から補填した分も含むため、こちらの数字とは一致しません(現金だけで賄えた年はこのグラフの取り崩しは0になります)。含み損(運用益がマイナス)の年は、運用益の棒を0として表示します(実際の値はホバーのツールチップでご確認ください)。<br><b>社会保険料・医療費控除・配偶者控除について:</b> 「社会保険料・追加控除」欄のチェックボックスで、これらをまとめて計算に含めるかどうかを切り替えられます。健康保険・介護保険料等の社会保険料は、現役時代は給与に対する概算料率(既定15%)、退職後(給与終了後)は年額(既定40万円、物価上昇率で調整)で概算し、社会保険料控除として税額を軽減するだけでなく、実際の支出としても収支に反映します(年次内訳の「支出」列に内数で表示)。医療費控除は、入力した年間医療費(本人+パートナー合算を想定)から「10万円と総所得金額の5%の低い方」を差し引いた額(上限200万円)を、本人の総所得金額から控除します。配偶者控除は「配偶者控除の対象となる配偶者がいる」にチェックを入れた場合のみ適用し、パートナーの年金額(既存パラメータ)から配偶者の合計所得金額を自動判定します。配偶者の合計所得金額が48万円を超える場合は控除0とし、より複雑な配偶者特別控除(48万円超133万円以下で段階的に減る控除)は考慮していません。配偶者の年齢は「本人との年齢差」から求めた実年齢を使用します(70歳以上の場合の割増控除額の判定に使用)。社会保険料控除・医療費控除・配偶者控除はいずれも本人の確定申告にのみ適用し、パートナー自身の(別世帯主体としての)申告には適用していません。<br><b>ライフステージ・リスク設定について:</b> 年間支出は「年間支出×(1+支出上昇率)^経過年数×年齢帯別の支出倍率」で算出します(初期値は74歳まで100%、75〜84歳85%、85歳以降90%)。ベースとなる年間支出は「支出」欄で2段階に設定でき、「支出変更年齢」(既定66歳)に達した年から2段目の額に切り替えます(既定では前半・後半とも同額のため、片方だけを変えれば差が出ます)。スポット(一時的)支出は最大3件まで登録でき、指定した年齢の年に一度だけ支出へ加算します(「物価上昇率を適用する」をONにした行は、入力額を現在価値とみなして発生年までの上昇分を上乗せします)。運用利回りは「年齢に応じて運用利回りを切り替える」がONの場合、65歳まで・66〜75歳・76歳以降の3段階(初期値3.5%/2.5%/1.5%)を年齢に応じて適用し、OFFの場合は「資産・運用」欄の運用利回りを全年齢に一律適用します。いずれも年齢による決め打ちの想定であり、実際の支出の推移や市場の変動を予測するものではありません。<br><b>公的年金の繰上げ・繰下げについて:</b> 「繰上げ・繰下げ受給による年額の増減を自動調整する」がONの場合、入力した年額を65歳から受け取る場合の額とみなし、受給開始年齢に応じて増減させます(繰上げ=1ヶ月あたり-0.4%・最大-24%、繰下げ=1ヶ月あたり+0.7%・最大+84%)。パートナーの年金にも同じ率を適用し、こちらはパートナー自身の受給開始年齢で判定します(受給が始まるのが本人の何歳のときかは、入力した年齢差から算出します)。60歳未満・75歳超を入力した場合は制度の上下限に丸めて計算します。在職老齢年金による支給停止は考慮していません。<br><b>加給年金について:</b> 「加給年金を追加する」(既定OFF)をONにすると、本人の厚生年金加入期間が20年以上ある(「受給要件」チェックボックスで指定)前提で、本人が65歳に達して年金を受給中(繰上げ受給を選んでいても加給年金自体は65歳より前には始まらず、繰下げ待機中も年金と同様に不支給です)、かつパートナーが65歳未満の間、本人の公的年金に加給年金額(年額、既定40万8,100円・概算)を上乗せします。パートナーが65歳になった時点で打ち切られ、配偶者の年金に付く「振替加算」は考慮していません。子の加算、配偶者自身の所得や厚生年金加入期間による支給停止にも対応していません。<br><b>死亡・遺族厚生年金について:</b> 「本人の死亡年齢を設定する」「パートナーの死亡年齢を設定する」(既定OFF)をそれぞれONにすると、指定した年齢に達した年から、その人の給与・退職後の少額収入・退職金・DC年金・個人年金・公的年金(加給年金含む)をすべて0として扱います(死亡年齢そのものの年も含む)。「遺族厚生年金を計算に含める」をONにすると、死亡した人について入力した老齢厚生年金相当額(報酬比例部分。基礎年金分は含めない)の3/4を、生存側に非課税(所得税・住民税とも課税対象外)で毎年上乗せします。中高齢寡婦加算(現行制度では40〜64歳の妻のみが対象で、このアプリは性別を管理していないため非対応)、65歳以降に生存側自身の老齢厚生年金と遺族厚生年金を調整する仕組み、遺族基礎年金(子のある配偶者・子のみが対象で、このアプリは子を考慮していないため非対応)、支給要件(保険料納付済期間など)の判定は考慮していません。配偶者控除は、パートナーが死亡した年より後は適用しません。生存側の生活費(支出)は死亡前と変更せず試算します。本人・パートナーの両方が死亡した年より後は、年次内訳・グラフともに行を生成せず試算を打ち切ります。<br><b>収入内訳グラフについて:</b> 給与・DC年金・個人年金・公的年金は税引前(額面)の金額を表示しています。公的年金は<b>本人・パートナーを別の色(赤系統の濃淡)</b>で分けて積み上げています。「取り崩し」は、税引後の収入(給与等-税金-社会保険料)だけではその年の支出を賄えなかった不足分で、<b>投資資産の内訳グラフの取り崩し(売却手取り)と同じ薄い灰色</b>で表示しています(ただしこちらは現金からの補填も含む世帯ベースの不足額のため、投資資産の内訳グラフの数字とは一致しません)。赤字の年は、棒の合計(税引前収入+取り崩し)は「年間支出(生活費)」の線ではなく、生活費に社会保険料・税金を加えた「支出+保険料+税金(実質支出)」の線と一致します。2本の線の間隔が、その年の社会保険料+税額に相当します。
     </div>
   </main>
 </div>
@@ -1095,7 +1101,7 @@ td[data-col]{cursor:help;}
       <button class="modal-close" id="expenseModalClose" type="button" aria-label="閉じる">✕</button>
     </div>
     <div class="modal-body">
-      <p class="table-note" style="padding:0 0 14px;">科目ごとに月額(円)を入力すると、合計×12ヶ月分を「年間支出」欄へ反映できます。この内訳自体は試算の計算には使用されません(年間支出を組み立てるための参考ツールです)。自動車税など年払いの科目は、月割りした金額を入力してください。</p>
+      <p class="table-note" style="padding:0 0 14px;">科目ごとに月額(円)を入力すると、合計×12ヶ月分を「年間支出」欄(支出変更年齢の前・後のどちらか)へ反映できます。この内訳自体は試算の計算には使用されません(年間支出を組み立てるための参考ツールです)。自動車税など年払いの科目は、月割りした金額を入力してください。</p>
       <div class="field-row">
         <div class="field"><label>家賃<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expRent" value="0"></div>
         <div class="field"><label>光熱費<span class="unit">円/月</span></label><input type="text" inputmode="numeric" id="expUtility" value="0"></div>
@@ -1125,7 +1131,8 @@ td[data-col]{cursor:help;}
         <span id="expenseCatAnnualTotal">0円</span>
       </div>
       <div class="modal-actions">
-        <button class="run-btn" id="expenseApplyBtn" type="button">この金額を「年間支出」に反映</button>
+        <button class="sheets-btn" id="expenseApplyBtn" type="button">「年間支出(<span class="expense-phase1-label">〜65歳</span>)」に反映</button>
+        <button class="run-btn" id="expenseApplyBtn2" type="button">「年間支出(<span class="expense-phase2-label">66歳〜</span>)」に反映</button>
       </div>
     </div>
   </div>
@@ -1136,7 +1143,7 @@ td[data-col]{cursor:help;}
 const AMOUNT_INPUT_IDS = [
   'salaryPhase1','salaryPhase2','postRetIncome','lumpSum','dcTotal','personalPensionTotal','kakyuNenkinAmount',
   'primaryBasicPension','primaryKouseiPension','partnerBasicPension','partnerKouseiPension',
-  'annualExpense','retiredInsuranceAnnual','medicalExpenseAnnual','investStart','cashStart',
+  'annualExpense','annualExpense2','retiredInsuranceAnnual','medicalExpenseAnnual','investStart','cashStart',
   'cashTargetAmount','nisaAnnualLimit','nisaLifetimeLimit','nisaStart',
   'spotAmount1','spotAmount2','spotAmount3',
   'expRent','expUtility','expCommunication','expFood','expDaily','expCarTax','expInsurance','expSocial','expFixed','expOther',
@@ -1541,6 +1548,9 @@ function readParams(){
     partnerDeathAge: v('partnerDeathAge'),
     applySurvivorPension: document.getElementById('applySurvivorPension').checked,
     annualExpense: v('annualExpense'),
+    // 空欄・0のときは2段目へ切り替えず、1段目の年間支出を全年齢に適用する
+    expensePhase2StartAge: v('expensePhase2StartAge') > 0 ? v('expensePhase2StartAge') : Infinity,
+    annualExpense2: v('annualExpense2'),
     inflationRate: v('inflationRate'),
     workingInsuranceRate: Math.min(Math.max(v('workingInsuranceRate'),0),100),
     retiredInsuranceAnnual: Math.max(v('retiredInsuranceAnnual'),0),
@@ -1743,9 +1753,11 @@ function runSimulation(p){
     const yearsElapsed = age - p.currentAge;
     const inflationFactor = Math.pow(1 + p.inflationRate/100, yearsElapsed);
 
+    // 年間支出は「支出変更年齢」の前後で2段階(現役・再雇用中と年金生活とで生活費が変わる想定)
+    const annualExpense = age < p.expensePhase2StartAge ? p.annualExpense : p.annualExpense2;
     // ライフステージ別の支出倍率。物価上昇率を適用した後の年間支出に、その年の年齢に応じた倍率を掛ける
     const expenseRatio = (age < 75 ? p.expenseRatioUnder75 : age < 85 ? p.expenseRatio75to84 : p.expenseRatio85plus) / 100;
-    const baseExpense = p.annualExpense * inflationFactor * expenseRatio;
+    const baseExpense = annualExpense * inflationFactor * expenseRatio;
     // スポット(一時的)支出。該当年齢の年に一度だけ加算する(物価上昇率の適用は行ごとの設定に従う)
     const spots = p.spotExpenses.filter(s => s.age === age);
     const spotExpense = spots.reduce((sum, s) => sum + (s.inflate ? s.amount * inflationFactor : s.amount), 0);
@@ -2774,7 +2786,7 @@ const INPUT_IDS = [
   'primaryBasicPension','primaryKouseiPension','pensionStartAge',
   'partnerBasicPension','partnerKouseiPension','partnerAgeDiff','partnerPensionStartAge','kakyuNenkinAmount',
   'primaryDeathAge','partnerDeathAge',
-  'annualExpense','inflationRate',
+  'annualExpense','expensePhase2StartAge','annualExpense2','inflationRate',
   'expRent','expUtility','expCommunication','expFood','expDaily','expCarTax','expInsurance','expSocial','expFixed','expOther',
   'expenseRatioUnder75','expenseRatio75to84','expenseRatio85plus',
   'spotName1','spotAge1','spotAmount1','spotName2','spotAge2','spotAmount2','spotName3','spotAge3','spotAmount3',
@@ -2820,14 +2832,21 @@ function collectFormValues(){
    partnerPensionStartOffset(本人の受給開始年齢からの年数。当時はパートナーの年齢=本人の年齢という前提)
    → partnerAgeDiff=0 / partnerPensionStartAge=本人の受給開始年齢+その年数 */
 function migrateFormValues(values){
-  if(!values || values.partnerPensionStartOffset === undefined) return values;
-  const migrated = {...values};
-  if(migrated.partnerPensionStartAge === undefined){
-    const selfStart = parseAmount(migrated.pensionStartAge);
-    migrated.partnerPensionStartAge = String(selfStart + parseAmount(migrated.partnerPensionStartOffset));
-    migrated.partnerAgeDiff = '0';
+  if(!values) return values;
+  let migrated = values;
+  if(migrated.partnerPensionStartOffset !== undefined){
+    migrated = {...migrated};
+    if(migrated.partnerPensionStartAge === undefined){
+      const selfStart = parseAmount(migrated.pensionStartAge);
+      migrated.partnerPensionStartAge = String(selfStart + parseAmount(migrated.partnerPensionStartOffset));
+      migrated.partnerAgeDiff = '0';
+    }
+    delete migrated.partnerPensionStartOffset;
   }
-  delete migrated.partnerPensionStartOffset;
+  // 年間支出が1段だった頃の保存データ。2段目にも同じ額を入れて、試算結果が変わらないようにする
+  if(migrated.annualExpense !== undefined && migrated.annualExpense2 === undefined){
+    migrated = {...migrated, annualExpense2: migrated.annualExpense};
+  }
   return migrated;
 }
 
@@ -2849,6 +2868,7 @@ function applyFormValues(rawValues){
   syncNisaOptions();
   updatePensionAdjustNote();
   updatePartnerDeathAgeNote();
+  updateExpensePhaseLabels();
 }
 
 /* 保存形式: {savedAt, values}。旧形式(値だけのフラットなオブジェクト)も読めるようにしておく */
@@ -3062,11 +3082,25 @@ expenseModalBackdrop.addEventListener('click', (e) => {
 window.addEventListener('keydown', (e) => {
   if(e.key === 'Escape' && expenseModalBackdrop.classList.contains('show')) closeExpenseModal();
 });
-document.getElementById('expenseApplyBtn').addEventListener('click', () => {
+function applyExpenseBreakdownTo(targetId){
   const monthly = EXPENSE_CATEGORY_IDS.reduce((sum, id) => sum + parseAmount(document.getElementById(id).value), 0);
-  document.getElementById('annualExpense').value = formatAmountValue(String(Math.round(monthly*12)));
+  document.getElementById(targetId).value = formatAmountValue(String(Math.round(monthly*12)));
   closeExpenseModal();
-});
+}
+document.getElementById('expenseApplyBtn').addEventListener('click', () => applyExpenseBreakdownTo('annualExpense'));
+document.getElementById('expenseApplyBtn2').addEventListener('click', () => applyExpenseBreakdownTo('annualExpense2'));
+
+/* 年間支出2段目の区切り年齢は編集できるため、サイドバー・モーダルのラベルを入力値に追従させる */
+function updateExpensePhaseLabels(){
+  const startAge = parseFloat(document.getElementById('expensePhase2StartAge').value);
+  const valid = Number.isFinite(startAge);
+  const phase1 = valid ? `〜${startAge-1}歳` : '前半';
+  const phase2 = valid ? `${startAge}歳〜` : '後半';
+  document.querySelectorAll('.expense-phase1-label').forEach(el => { el.textContent = phase1; });
+  document.querySelectorAll('.expense-phase2-label').forEach(el => { el.textContent = phase2; });
+}
+document.getElementById('expensePhase2StartAge').addEventListener('input', updateExpensePhaseLabels);
+updateExpensePhaseLabels();
 
 /* ================= PDFレポート出力 ================= */
 // 印刷時はサイドバーが非表示になるため、入力パラメータを左パネルの表示内容から
@@ -3146,6 +3180,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   syncNisaOptions();
   updatePensionAdjustNote();
   updatePartnerDeathAgeNote();
+  updateExpensePhaseLabels();
   await loadParams({silent:true}); // 起動時は保存データがあれば自動復元(なければ初期値のまま)
   calculate();
 });
