@@ -1070,7 +1070,7 @@ td[data-col]{cursor:help;}
           <thead>
             <tr>
               <th>年齢</th><th>給与</th><th>少額収入</th><th>退職金</th><th>DC年金</th><th>個人年金</th><th>公的年金</th>
-              <th>支出(内 保険料)</th><th>内 スポット支出</th><th>税金計(内 運用益)</th><th>純CF</th><th>現金残高</th><th>運用残高</th><th>総資産</th>
+              <th>支出(内 保険料)</th><th>内 スポット支出</th><th>税金計(内 運用益)</th><th>純CF</th><th>投資積立</th><th>運用益</th><th>現金残高</th><th>運用残高</th><th>総資産</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -1593,6 +1593,7 @@ function runSimulation(p){
   let nisaFreedNextYear = 0; // 売却した簿価分。制度どおり翌年に枠が復活する
   let gainsTaxThisYear = 0;
   let investSoldNetThisYear = 0; // その年に運用資産を売却して得た手取り(売却総額 - 運用益課税)
+  let investedThisYear = 0; // その年に運用資産へ新規に投入した額(投資積立。NISAへの移し替えは含めない)
 
   let cumulativeTax = 0;
   let cumulativeGainsTax = 0;
@@ -1623,6 +1624,11 @@ function runSimulation(p){
     : 0;
 
   const investIn = amount => {
+    const notInvested = investInRaw(amount);
+    investedThisYear += Math.max(amount, 0) - notInvested;
+    return notInvested;
+  };
+  const investInRaw = amount => {
     if(amount <= 0) return 0;
     let rest = amount;
     const lifetimeRoom = p.nisaLifetimeLimit - nisaLifetimeUsed;
@@ -1703,6 +1709,7 @@ function runSimulation(p){
     nisaFreedNextYear = 0;
     gainsTaxThisYear = 0;
     investSoldNetThisYear = 0;
+    investedThisYear = 0;
     // パートナーの年齢は本人の年齢+年齢差。年金の開始判定・公的年金等控除・配偶者控除の年齢判定に使う
     const partnerAge = age + p.partnerAgeDiff;
     // 死亡年齢に達した年から、その人の収入はすべて0として扱う(死亡年齢そのものの年も含む)
@@ -1839,7 +1846,9 @@ function runSimulation(p){
       const room = nisaRoom();
       if(room > 1e-6){
         const moved = investOut(room, {accounts: [taxable], asDrawdown: false});
+        const investedBeforeRelay = investedThisYear;
         cash += investIn(moved); // 端数で投資しきれなかった分だけ現金へ戻す(通常は0)
+        investedThisYear = investedBeforeRelay; // 移し替えは新規の積立ではない
       }
     }
 
@@ -1848,8 +1857,10 @@ function runSimulation(p){
       ? (age <= 65 ? p.returnRateUnder65 : age <= 75 ? p.returnRate66to75 : p.returnRate76plus)
       : p.investReturnRate;
     const growth = 1 + returnRate/100;
+    const investBeforeGrowth = investBal();
     nisa.bal *= growth;
     taxable.bal *= growth;
+    const investReturn = investBal() - investBeforeGrowth; // その年の運用益(利回りによる残高の増減)
 
     if(nisaFullAge===null && p.nisaLifetimeLimit > 0 && nisaLifetimeUsed >= p.nisaLifetimeLimit - 1e-6) nisaFullAge = age;
 
@@ -1870,7 +1881,7 @@ function runSimulation(p){
     const drawdown = Math.max(0, -netCashFlow);
 
     rows.push({age, year:p.currentYear+yearsElapsed, salary, postRetIncome, lump, dc, personalPension, pension, kakyuNenkin, partnerPension, survivorPension, primaryAlive, partnerAlive, partnerAge, expense,
-      baseExpense, spotExpense, spotLabel, expenseRatio, returnRate,
+      baseExpense, spotExpense, spotLabel, expenseRatio, returnRate, invested: investedThisYear, investReturn,
       insurancePremium, totalTax, otherTax, partnerTax, lumpTax, lumpDeduction, lumpTaxable,
       gainsTax: gainsTaxThisYear, gainsTaxRatePct: p.applyGainsTax ? p.gainsTaxRate : 0,
       investSoldNet: investSoldNetThisYear,
@@ -2401,6 +2412,8 @@ function renderTable(result){
       <td>${r.spotExpense>0.5 ? yen(r.spotExpense) : '—'}${r.spotLabel? ` <span class="tax-sub">(${escapeHtml(r.spotLabel)})</span>` : ''}</td>
       <td data-col="tax">${yen(r.totalTax)} <span class="tax-sub">(${r.gainsTax>0.5? yen(r.gainsTax) : '—'})</span></td>
       <td class="${r.netCashFlow<0?'neg':''}" data-col="netcf">${yen(r.netCashFlow)}</td>
+      <td>${r.invested>0.5? yen(r.invested):'—'}</td>
+      <td class="${r.investReturn<0?'neg':''}">${Math.abs(r.investReturn)>0.5? yen(r.investReturn):'—'}</td>
       <td>${yen(r.cash)}</td>
       <td data-col="invest">${yen(r.invest)}</td>
       <td class="${negCls}" data-col="total">${yen(r.total)}</td>
@@ -2550,6 +2563,8 @@ const ANNUAL_COLUMNS = [
   {header:'税金計', type:'amount', get:r => r.totalTax},
   {header:'内 運用益課税', type:'amount', get:r => r.gainsTax},
   {header:'純CF', type:'amount', get:r => r.netCashFlow},
+  {header:'投資積立', type:'amount', get:r => r.invested},
+  {header:'運用益', type:'amount', get:r => r.investReturn},
   {header:'現金残高', type:'amount', get:r => r.cash},
   {header:'運用残高', type:'amount', get:r => r.invest},
   {header:'総資産', type:'amount', get:r => r.total},
